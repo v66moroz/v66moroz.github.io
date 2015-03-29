@@ -41,7 +41,7 @@
 
 add_2 [<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>]
 <span class="co">-- [3,4,5]</span></code></pre></div>
-<p>We used currying twice here: <code>(2 +)</code> creates a single argument function which adds <code>2</code> to it’s argument, then <code>map (2 +)</code> creates a single argument function which takes an array and applies previously defined function to every element of it. Nice and clean.</p>
+<p>We used currying twice here: <code>(2 +)</code> creates a single argument function which adds <code>2</code> to it’s argument, then <code>map (2 +)</code> creates a single argument function which takes a list and applies previously defined function to every element of it. Nice and clean.</p>
 <h3 id="scala">Scala</h3>
 <p>To start with, Scala doesn’t have Haskell-type functions. In fact, every functional object in Scala is a <em>method</em>. What’s the difference? Scala is OO language, so it works with objects. Objects consist of a state and methods, so every method is attached to some object. What does it change? Well, every method has an additional implicit argument, called <code>this</code>. So when we write <code>2 + 3</code> we in fact call some polymorphic function <code>@+(2, 3)</code>, which in OO notation looks like <code>2.+(3)</code>. As a result not all arguments are created equal and currying becomes much less elegant. Let’s write <code>(2 +)</code> in Scala:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">val</span> plus_2: Int =&gt; Int = <span class="dv">2</span>.`+`</code></pre></div>
