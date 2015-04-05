@@ -57,6 +57,26 @@
 p <span class="dt">Primes</span>.new.primes.take(<span class="dv">10</span>).force
 <span class="co">#=&gt; [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]</span></code></pre></div>
 <p><code>flat_map { |x| x }</code> is the only known to me way to concatenate two lazy enumerators.</p>
+<p>Having defined the lazy sequence of prime numbers I can easily find prime factors of a positive integer, but to avoid recursion it’s handy to define <code>uninject</code> method first:</p>
+<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">def</span> uninject(a)
+  xs = []
+  while xa = <span class="kw">yield</span>(a) <span class="kw">do</span>
+    x, a = xa
+    xs &lt;&lt; x
+  <span class="kw">end</span>
+  xs
+<span class="kw">end</span>
+
+<span class="kw">def</span> prime_factors(n)
+  uninject([<span class="dt">Primes</span>.new.primes, n]) <span class="kw">do</span> |ps, a|
+    <span class="kw">if</span> a &gt; <span class="dv">1</span>
+      ps = ps.drop_while { |p| a % p != <span class="dv">0</span> }
+      [ps.first, [ps, a / ps.first]]
+    <span class="kw">end</span>
+  <span class="kw">end</span>
+<span class="kw">end</span>
+
+prime_factors(<span class="dv">315</span>) <span class="co">#=&gt; [3, 3, 5, 7]</span></code></pre></div>
 
         </div>
         <div id="footer">
