@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <title>Victor Moroz - Tail call optimization in Ruby with trampolines</title>
+        <link rel="stylesheet" type="text/css" href="../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../">Victor Moroz</a>
+            </div>
+            <div id="navigation">
+                <a href="../">Home</a>
+<!--                 <a href="/about.html">About</a>
+                <a href="/contact.html">Contact</a>
+ -->                <a href="../archive.html">Archive</a>
+            </div>
+        </div>
+
+        <div id="content">
+            <h3>Tail call optimization in Ruby with trampolines</h3>
+
+            <div class="info">
+    Posted on April 17, 2015
+    
+</div>
+
+<p>The idea is taken from Clojure.</p>
+<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">def</span> trampoline
+  f = <span class="kw">yield</span>
+  loop <span class="kw">do</span>
+    <span class="kw">case</span> f
+    <span class="kw">when</span> <span class="dt">Proc</span>
+      f = f[]
+    <span class="kw">else</span>
+      <span class="kw">break</span> f
+    <span class="kw">end</span>
+  <span class="kw">end</span>
+<span class="kw">end</span>
+
+<span class="kw">def</span> fact(n, acc)
+  <span class="kw">if</span> n &gt; <span class="dv">0</span>
+    -&gt; { fact(n - <span class="dv">1</span>, acc * n) }
+  <span class="kw">else</span>
+    acc
+  <span class="kw">end</span>
+<span class="kw">end</span>
+
+trampoline { fact(<span class="dv">100000</span>, <span class="dv">1</span>) }
+<span class="co">#=&gt; 282422940796034787429342157802453551847749492609...</span>
+
+<span class="kw">def</span> fib(a, b, n)
+  <span class="kw">if</span> n &gt; <span class="dv">0</span>
+    -&gt; { fib(b, a + b, n - <span class="dv">1</span>)}
+  <span class="kw">else</span>
+    a
+  <span class="kw">end</span>
+<span class="kw">end</span>
+
+(<span class="dv">0</span>..<span class="dv">9</span>).map { |i| trampoline { fib(<span class="dv">0</span>, <span class="dv">1</span>, i) } }
+<span class="co">#=&gt; [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]</span>
+
+trampoline { fib(<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">100000</span>) }
+<span class="co">#=&gt; 259740693472217241661550340212759...</span>
+
+<span class="co"># Mutual recursion</span>
+
+<span class="kw">def</span> isEven(xs)
+  xs.empty? || -&gt; { isOdd(xs[<span class="dv">1</span>..-<span class="dv">1</span>]) }
+<span class="kw">end</span>
+
+<span class="kw">def</span> isOdd(xs)
+  !xs.empty? &amp;&amp; -&gt; { isEven(xs[<span class="dv">1</span>..-<span class="dv">1</span>]) }
+<span class="kw">end</span>
+
+trampoline { isEven((<span class="dv">0</span>..<span class="dv">10000</span>).to_a) } <span class="co">#=&gt; false</span>
+trampoline { isOdd((<span class="dv">0</span>..<span class="dv">10000</span>).to_a)  } <span class="co">#=&gt; true</span>
+trampoline { isEven((<span class="dv">0</span>..<span class="dv">10001</span>).to_a) } <span class="co">#=&gt; true</span>
+trampoline { isOdd((<span class="dv">0</span>..<span class="dv">10001</span>).to_a)  } <span class="co">#=&gt; false</span></code></pre></div>
+<p>There is also a more strict approach taken from Scala, but it seems a bit heavy for Ruby:</p>
+<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">class</span> <span class="dt">Done</span>
+  <span class="ot">attr_reader</span> <span class="st">:a</span>
+
+  <span class="kw">def</span> initialize(a)
+    <span class="ot">@a</span> = a
+  <span class="kw">end</span>
+
+  <span class="kw">def</span> result
+    a
+  <span class="kw">end</span>
+<span class="kw">end</span>
+
+<span class="kw">def</span> <span class="dt">Done</span>(a)
+  <span class="dt">Done</span>.new(a)
+<span class="kw">end</span>
+
+<span class="kw">class</span> <span class="dt">Call</span>
+  <span class="ot">attr_reader</span> <span class="st">:rest</span>
+
+  <span class="kw">def</span> initialize
+    <span class="ot">@rest</span> = -&gt; { <span class="kw">yield</span> }
+  <span class="kw">end</span>
+
+  <span class="kw">def</span> result
+    next_r = rest[]
+    loop <span class="kw">do</span>
+      <span class="kw">case</span> next_r
+      <span class="kw">when</span> <span class="dt">Done</span>
+        <span class="kw">break</span> next_r.a
+      <span class="kw">when</span> <span class="dt">Call</span>
+        next_r = next_r.rest[]
+      <span class="kw">end</span>
+    <span class="kw">end</span>
+  <span class="kw">end</span>
+<span class="kw">end</span>
+
+<span class="kw">def</span> <span class="dt">Call</span>
+  <span class="dt">Call</span>.new {
+    <span class="kw">yield</span>
+  }
+<span class="kw">end</span>
+
+<span class="kw">def</span> isEven(xs)
+  xs.empty? ? <span class="dt">Done</span>(<span class="dv">true</span>) : <span class="dt">Call</span> { isOdd(xs[<span class="dv">1</span>..-<span class="dv">1</span>]) }
+<span class="kw">end</span>
+
+<span class="kw">def</span> isOdd(xs)
+  xs.empty? ? <span class="dt">Done</span>(<span class="dv">false</span>) : <span class="dt">Call</span> { isEven(xs[<span class="dv">1</span>..-<span class="dv">1</span>]) }
+<span class="kw">end</span>
+
+isEven((<span class="dv">0</span>..<span class="dv">9999</span>).to_a).result   <span class="co">#=&gt; true</span>
+isOdd((<span class="dv">0</span>..<span class="dv">9999</span>).to_a).result    <span class="co">#=&gt; false</span>
+isEven((<span class="dv">0</span>..<span class="dv">10000</span>).to_a).result  <span class="co">#=&gt; false</span>
+isOdd((<span class="dv">0</span>..<span class="dv">10000</span>).to_a).result   <span class="co">#=&gt; true</span>
+
+<span class="kw">def</span> fact(n, acc)
+  <span class="kw">if</span> n &gt; <span class="dv">0</span>
+    <span class="dt">Call</span> { fact(n - <span class="dv">1</span>, acc * n) }
+  <span class="kw">else</span>
+    <span class="dt">Done</span>(acc)
+  <span class="kw">end</span>
+<span class="kw">end</span>
+
+fact(<span class="dv">100000</span>, <span class="dv">1</span>).result
+<span class="co">#=&gt; 28242294079603478742934215780245355184...</span></code></pre></div>
+
+        </div>
+        <div id="footer">
+            Generated by
+            <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+    </body>
+</html>
