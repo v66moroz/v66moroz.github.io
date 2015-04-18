@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <title>Victor Moroz - Algebraic data types (unions) in Ruby</title>
+        <link rel="stylesheet" type="text/css" href="../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../css/syntax.css" />
+        <script>
+            (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+            m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+            })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+            ga('create', 'UA-62008520-1', 'auto');
+            ga('send', 'pageview');
+        </script>
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../">Victor Moroz</a>
+            </div>
+            <div id="navigation">
+                <a href="../">Home</a>
+<!--                 <a href="/about.html">About</a>
+                <a href="/contact.html">Contact</a>
+ -->                <a href="../archive.html">Archive</a>
+            </div>
+        </div>
+
+        <div id="content">
+            <h3>Algebraic data types (unions) in Ruby</h3>
+            <div class="info">
+    Posted on September 20, 2013
+    
+</div>
+
+<p>Let’s consider a simple tree defined in Haskell as</p>
+<div class="sourceCode"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Tree</span> a <span class="fu">=</span> <span class="dt">Empty</span>
+          <span class="fu">|</span> <span class="dt">Node</span> a (<span class="dt">Tree</span> a) (<span class="dt">Tree</span> a)</code></pre></div>
+<p>Naive Ruby’s approach would be defining a class <code>Node</code> and assuming node is a leaf when both left and right sub-trees are <code>nil</code> (i. e. <code>nil</code> is representing an empty tree):</p>
+<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">class</span> <span class="dt">Node</span>
+  <span class="kw">def</span> initialize(v, left, right)
+    <span class="ot">@v</span>, <span class="ot">@left</span>, <span class="ot">@right</span> = v, left, right
+  <span class="kw">end</span>
+ 
+  <span class="kw">def</span> each(&amp;block)
+    <span class="ot">@left</span>.each(&amp;block) <span class="kw">if</span> <span class="ot">@left</span>
+    block[<span class="ot">@v</span>]
+    <span class="ot">@right</span>.each(&amp;block) <span class="kw">if</span> <span class="ot">@right</span>
+  <span class="kw">end</span>
+<span class="kw">end</span></code></pre></div>
+<p>But it doesn’t work well. First of all <code>if @left</code> is not a good recursive approach, but more importantly there is no standalone representation of an empty tree. But unions can be represented by using inheritance:</p>
+<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">class</span> <span class="dt">Tree</span>
+  <span class="kw">def</span> <span class="dv">self</span>.empty
+    <span class="dt">Empty</span>.new
+  <span class="kw">end</span>
+ 
+  <span class="kw">def</span> flatten
+    vs = []
+    each <span class="kw">do</span> |v|
+      vs &lt;&lt; v
+    <span class="kw">end</span>
+    vs
+  <span class="kw">end</span>
+<span class="kw">end</span>
+ 
+<span class="kw">class</span> <span class="dt">Empty</span> &lt; <span class="dt">Tree</span>
+  <span class="kw">def</span> each
+  <span class="kw">end</span>
+ 
+  <span class="kw">def</span> append(v)
+    <span class="dt">Node</span>.new(v, <span class="dt">Tree</span>.empty, <span class="dt">Tree</span>.empty)
+  <span class="kw">end</span>
+<span class="kw">end</span>
+ 
+<span class="kw">class</span> <span class="dt">Node</span> &lt; <span class="dt">Tree</span>
+  <span class="kw">def</span> initialize(v, left, right)
+    <span class="ot">@v</span>, <span class="ot">@left</span>, <span class="ot">@right</span> = v, left, right
+  <span class="kw">end</span>
+ 
+  <span class="kw">def</span> each(&amp;block)
+    <span class="ot">@left</span>.each(&amp;block)
+    block[<span class="ot">@v</span>]
+    <span class="ot">@right</span>.each(&amp;block)
+  <span class="kw">end</span>   
+ 
+  <span class="kw">def</span> append(v)
+    <span class="kw">if</span> v &lt; <span class="ot">@v</span>
+      <span class="dt">Node</span>.new(<span class="ot">@v</span>, <span class="ot">@left</span>.append(v), <span class="ot">@right</span>)
+    <span class="kw">elsif</span> v &gt; <span class="ot">@v</span>
+      <span class="dt">Node</span>.new(<span class="ot">@v</span>, <span class="ot">@left</span>, <span class="ot">@right</span>.append(v))
+    <span class="kw">else</span>
+      <span class="dv">self</span>
+    <span class="kw">end</span>
+  <span class="kw">end</span>
+<span class="kw">end</span>
+ 
+<span class="dt">Tree</span>.empty.append(<span class="dv">1</span>).append(<span class="dv">0</span>).append(<span class="dv">3</span>).flatten
+<span class="co">#=&gt; [0, 1, 3]</span></code></pre></div>
+<p>Now I can add a bunch of methods to the <code>Tree</code> class based on <code>each</code>, e. g. <code>map</code>. I don’t want to include <code>Enumerable</code> because that <code>map</code> will return me an array, but what I really want is the same data structure, i. e. <code>Tree</code>.</p>
+<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">class</span> <span class="dt">Tree</span>
+ 
+...
+ 
+  <span class="kw">def</span> fmap(&amp;block)
+    r = <span class="dv">self</span>.class.empty
+    each <span class="kw">do</span> |v| 
+      r = r.append(block[v])
+    <span class="kw">end</span>
+    r
+  <span class="kw">end</span>
+<span class="kw">end</span>
+
+p <span class="dt">Tree</span>.empty.append(<span class="dv">1</span>).append(<span class="dv">0</span>).append(<span class="dv">3</span>).fmap { |x| - x }.flatten
+<span class="co">#=&gt; [-3, -1, 0]</span></code></pre></div>
+<p>Meanwhile the implementation of <code>fmap</code> is based on two methods: <code>self.empty</code> and <code>append</code>, so if I define those methods for any other class I can get <code>fmap</code> for free (I will rename them to <code>fempty</code> and <code>fappend</code> so I don’t clash with Ruby names). I have always wondered why map over a <code>Hash</code> returns an <code>Array</code> while it should have returned a <code>Hash</code>:</p>
+<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">module</span> <span class="dt">Functor</span>
+  <span class="kw">def</span> fmap(&amp;block)
+    r = <span class="dv">self</span>.class.fempty
+    each <span class="kw">do</span> |v| 
+      r = r.fappend(block[v])
+    <span class="kw">end</span>
+    r
+  <span class="kw">end</span>
+<span class="kw">end</span>
+ 
+<span class="kw">class</span> <span class="dt">Hash</span>
+  include <span class="dt">Functor</span>
+ 
+  <span class="kw">class</span> &lt;&lt; <span class="dv">self</span>
+    <span class="kw">alias</span> <span class="st">:fempty</span> <span class="st">:new</span>
+  <span class="kw">end</span>
+ 
+  <span class="co"># Not very functional</span>
+  <span class="kw">def</span> fappend(kv)
+    k, v = kv
+    <span class="dv">self</span>[k] = v
+    <span class="dv">self</span>
+  <span class="kw">end</span>
+<span class="kw">end</span>
+ 
+{ <span class="st">:a</span> =&gt; <span class="dv">1</span> }.fmap { |k, v| [k, <span class="dv">3</span>] }
+<span class="co">#=&gt; {:a =&gt; 3}</span></code></pre></div>
+<p>Linked list can be defined in a similar fashion:</p>
+<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">class</span> <span class="dt">List</span>
+  include <span class="dt">Functor</span>
+ 
+  <span class="kw">class</span> &lt;&lt; <span class="dv">self</span>
+    <span class="kw">alias</span> <span class="st">:fempty</span> <span class="st">:new</span>
+  <span class="kw">end</span>
+ 
+  <span class="kw">def</span> to_a
+    xs = []
+    each <span class="kw">do</span> |x|
+      xs &lt;&lt; x
+    <span class="kw">end</span>
+    xs
+  <span class="kw">end</span>
+<span class="kw">end</span>
+ 
+<span class="kw">class</span> <span class="dt">Empty</span> &lt; <span class="dt">List</span>
+  <span class="kw">def</span> each
+  <span class="kw">end</span>
+ 
+  <span class="kw">def</span> fappend(v)
+    <span class="dt">Cons</span>.new(v, <span class="dt">List</span>.fempty)
+  <span class="kw">end</span>
+<span class="kw">end</span>
+ 
+<span class="kw">class</span> <span class="dt">Cons</span> &lt; <span class="dt">List</span>
+  <span class="kw">def</span> initialize(h, t)
+    <span class="ot">@h</span>, <span class="ot">@t</span> = h, t
+  <span class="kw">end</span>
+ 
+  <span class="kw">def</span> each(&amp;block)
+    block[<span class="ot">@h</span>]
+    <span class="ot">@t</span>.each(&amp;block)
+  <span class="kw">end</span>
+ 
+  <span class="kw">def</span> fappend(v)
+    <span class="dt">Cons</span>.new(v, <span class="dv">self</span>)
+  <span class="kw">end</span>
+<span class="kw">end</span>
+ 
+<span class="dt">List</span>.fempty.fappend(<span class="dv">1</span>).fappend(<span class="dv">2</span>).fmap{ |x| x + <span class="dv">1</span> }.to_a
+<span class="co">#=&gt; [2, 3]</span></code></pre></div>
+
+        </div>
+
+        
+            <div id="disqus_thread"></div>
+            <script type="text/javascript">
+                var disqus_shortname = 'blog-vmoroz-com';
+                var disqus_identifier = '52be1fe8-f320-47db-8c2c-bbbc5e41a69e';
+                
+                (function() {
+                    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+                    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+                    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+                })();
+            </script>
+            <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+        
+
+        <div id="footer">
+            Generated by
+            <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+    </body>
+</html>
