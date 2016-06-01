@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <title>Victor Moroz - Scala: Should I use a method or a function?</title>
+        <link rel="stylesheet" type="text/css" href="../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../css/syntax.css" />
+        <script>
+            (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+            m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+            })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+            ga('create', 'UA-62008520-1', 'auto');
+            ga('send', 'pageview');
+        </script>
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../">Victor Moroz</a>
+            </div>
+            <div id="navigation">
+                |
+                <a href="../">Index</a>
+<!--             
+                <a href="/about.html">About</a>
+                <a href="/contact.html">Contact</a>
+                <a href="/archive.html">Archive</a>
+-->        
+            </div>
+            <div class="spacer">
+            </div>
+        </div>
+
+        <div id="content">
+            <h3>Scala: Should I use a method or a function?</h3>
+            <div class="info">
+    Posted on June  1, 2016
+    
+</div>
+
+<p>This question is often raised on forums, and there is a great deal of confusion what’s the difference is and what should be used where. Scala has two function-like entities:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">class</span> Test {
+
+  # Method
+  <span class="kw">def</span> <span class="fu">m</span>(x: Int) = x + <span class="dv">1</span>
+
+  # Function
+  <span class="kw">val</span> f = (x: Int) =&gt; x + <span class="dv">1</span>
+}</code></pre></div>
+<p>Both of them can be used in a functional context:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">class</span> Test {
+
+  # Method
+  <span class="kw">def</span> <span class="fu">m</span>(x: Int) = x + <span class="dv">1</span>
+
+  # Function
+  <span class="kw">val</span> f = (x: Int) =&gt; x + <span class="dv">1</span>
+
+  # Using function
+  <span class="kw">def</span> x = <span class="fu">println</span>(List(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>).<span class="fu">map</span>(f))
+
+  # Using method
+  <span class="kw">def</span> y = <span class="fu">println</span>(List(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>).<span class="fu">map</span>(m))
+}</code></pre></div>
+<p>Similar, isn’t it? Let’s look closer.</p>
+<p><code>m</code> here is a method, the very same class method we are familiar with in Java. It’s not an object, can’t be passed anywhere and has no value. In fact it belongs to the class <code>Test</code> and only makes sense when calling it as <code>Test.m</code>. And indeed, decompiled bytecode shows it as <code>public static int m(int);</code> in class <code>Test</code>.</p>
+<p>But wait, we pass it to <code>map</code>, don’t we? First, let’s comment out <code>def y</code> and look at class files:</p>
+<pre><code>Test$$anonfun$1.class  Test.class  Test$.class</code></pre>
+<p>Nothing too interesting: our <code>Test</code> class, Scala-specific parts in <code>Test$</code> and anonymous function <code>f</code> in <code>Test$$anonfun$1</code>. Now let’s return <code>def y</code> back:</p>
+<pre><code>Test$$anonfun$1.class  Test$$anonfun$y$1.class  Test.class  Test$.class</code></pre>
+<p>Wait, what is <code>Test$$anonfun$y$1</code>? When seeing a class method in a functional context Scala creates another anonymous function class, which by the way is a class derived from <code>Function1</code> in this particular example, which has <code>apply</code> method, and that <code>apply</code> method simply calls <code>Test.m</code>. Okay, that’s a nice syntactic sugar and not actually news. Almost the same thing happens with <code>f</code>, an anonimous class is created and <code>apply</code> method is defined. There is one big difference though if we look at bytecode for <code>x</code> and <code>y</code>:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">x:
+
+  <span class="dv">24</span>: invokevirtual #<span class="dv">37</span>   <span class="co">// Method scala/Predef$.wrapIntArray:([I)Lscala/collection/mutable/WrappedArray;</span>
+  <span class="dv">27</span>: invokevirtual #<span class="dv">41</span>   <span class="co">// Method scala/collection/immutable/List$.apply:(Lscala/collection/Seq;)Lscala ...</span>
+  <span class="dv">30</span>: aload_0
+  <span class="dv">31</span>: invokevirtual #<span class="dv">43</span>   <span class="co">// Method f:()Lscala/Function1;</span>
+  <span class="dv">34</span>: getstatic     #<span class="dv">33</span>   <span class="co">// Field scala/collection/immutable/List$.MODULE$:Lscala/collection/immutable/List$;</span>
+  <span class="dv">37</span>: invokevirtual #<span class="dv">47</span>   <span class="co">// Method scala/collection/immutable/List$.canBuildFrom:()Lscala/collection/generic...</span>
+  <span class="dv">40</span>: invokevirtual #<span class="dv">53</span>   <span class="co">// Method scala/collection/immutable/List.map:(Lscala/Function1;Lscala/collection...</span>
+  <span class="dv">43</span>: invokevirtual #<span class="dv">57</span>   <span class="co">// Method scala/Predef$.println:(Ljava/lang/Object;)V</span>
+  <span class="dv">46</span>: <span class="kw">return</span>
+
+y:
+
+  <span class="dv">24</span>: invokevirtual #<span class="dv">37</span>   <span class="co">// Method scala/Predef$.wrapIntArray:([I)Lscala/collection/mutable/WrappedArray;</span>
+  <span class="dv">27</span>: invokevirtual #<span class="dv">41</span>   <span class="co">// Method scala/collection/immutable/List$.apply:(Lscala/collection/Seq;)Lscala ...</span>
+  <span class="dv">30</span>: <span class="kw">new</span>           #<span class="dv">60</span>   <span class="co">// class Test$$anonfun$y$1</span>
+  <span class="dv">33</span>: dup
+  <span class="dv">34</span>: invokespecial #<span class="dv">61</span>   <span class="co">// Method Test$$anonfun$y$1.&quot;&lt;init&gt;&quot;:()V</span>
+  <span class="dv">37</span>: getstatic     #<span class="dv">33</span>   <span class="co">// Field scala/collection/immutable/List$.MODULE$:Lscala/collection/immutable/List$;</span>
+  <span class="dv">40</span>: invokevirtual #<span class="dv">47</span>   <span class="co">// Method scala/collection/immutable/List$.canBuildFrom:()Lscala/collection/generic ...</span>
+  <span class="dv">43</span>: invokevirtual #<span class="dv">53</span>   <span class="co">// Method scala/collection/immutable/List.map:(Lscala/Function1;Lscala/collection ...</span>
+  <span class="dv">46</span>: invokevirtual #<span class="dv">57</span>   <span class="co">// Method scala/Predef$.println:(Ljava/lang/Object;)V</span>
+  <span class="dv">49</span>: <span class="kw">return</span></code></pre></div>
+<p>Every time I call <code>y</code> a <em>new</em> object of type <code>Test$$anonfun$y$1</code> is created and initialized! While in <code>x</code> nothing like this happens as <code>f</code> was instantiated when I assigned it to <code>f</code>, so the code simply calls <code>Test.f</code> to retrieve pre-initialized value.</p>
+<p>So given all this my suggestion would be to use explicit functions whenever higher-order functions/methods are involved and not rely on implicit conversions, and use methods in all other cases.</p>
+
+        </div>
+
+        
+            <div id="disqus_thread"></div>
+            <script type="text/javascript">
+                var disqus_shortname = 'blog-vmoroz-com';
+                var disqus_identifier = 'f606f8a6-5b42-4533-8bbe-fc4e1fc76745';
+                
+                (function() {
+                    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+                    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+                    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+                })();
+            </script>
+            <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+        
+
+        <div id="footer">
+            Generated by
+            <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+    </body>
+</html>
