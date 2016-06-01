@@ -69,7 +69,7 @@
 <p><code>m</code> here is a method, the very same class method we are familiar with in Java. It’s not an object, can’t be passed anywhere and has no value. In fact it belongs to the class <code>Test</code> and only makes sense when calling it as <code>Test.m</code>. And indeed, decompiled bytecode shows it as <code>public static int m(int);</code> in class <code>Test</code>.</p>
 <p>But wait, we pass it to <code>map</code>, don’t we? First, let’s comment out <code>def y</code> and look at class files:</p>
 <pre><code>Test$$anonfun$1.class  Test.classs</code></pre>
-<p>Nothing too interesting: our <code>Test</code> class<code>and anonymous function</code>f<code>in</code>Test$$anonfun$1<code>. Now let's return</code>def y` back:</p>
+<p>Nothing too interesting: our <code>Test</code> class and anonymous function <code>f</code> in <code>Test$$anonfun$1</code>. Now let’s return <code>def y</code> back:</p>
 <pre><code>Test$$anonfun$1.class  Test$$anonfun$y$1.class  Test.class</code></pre>
 <p>Wait, what is <code>Test$$anonfun$y$1</code>? When Scala sees a class method in a functional context it creates anonymous function class, which by the way is a class derived from <code>Function1</code> in this particular example, which has <code>apply</code> method, and that <code>apply</code> method simply calls <code>Test.m</code>. Almost the same thing happens with <code>f</code>, an anonimous class is created and <code>apply</code> method is defined. There is one big difference though if we look at bytecode for <code>x</code> and <code>y</code>:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">x:
