@@ -68,9 +68,9 @@
 <p>Similar, isn’t it? Let’s look closer.</p>
 <p><code>m</code> here is a method, the very same class method we are familiar with in Java. It’s not an object, can’t be passed anywhere and has no value. In fact it belongs to the class <code>Test</code> and only makes sense when calling it as <code>Test.m</code>. And indeed, decompiled bytecode shows it as <code>public static int m(int);</code> in class <code>Test</code>.</p>
 <p>But wait, we pass it to <code>map</code>, don’t we? First, let’s comment out <code>def y</code> and look at class files:</p>
-<pre><code>Test$$anonfun$1.class  Test.class  Test$.class</code></pre>
-<p>Nothing too interesting: our <code>Test</code> class, Scala-specific parts in <code>Test$</code> and anonymous function <code>f</code> in <code>Test$$anonfun$1</code>. Now let’s return <code>def y</code> back:</p>
-<pre><code>Test$$anonfun$1.class  Test$$anonfun$y$1.class  Test.class  Test$.class</code></pre>
+<pre><code>Test$$anonfun$1.class  Test.classs</code></pre>
+<p>Nothing too interesting: our <code>Test</code> class<code>and anonymous function</code>f<code>in</code>Test$$anonfun$1<code>. Now let's return</code>def y` back:</p>
+<pre><code>Test$$anonfun$1.class  Test$$anonfun$y$1.class  Test.class</code></pre>
 <p>Wait, what is <code>Test$$anonfun$y$1</code>? When Scala sees a class method in a functional context it creates anonymous function class, which by the way is a class derived from <code>Function1</code> in this particular example, which has <code>apply</code> method, and that <code>apply</code> method simply calls <code>Test.m</code>. Almost the same thing happens with <code>f</code>, an anonimous class is created and <code>apply</code> method is defined. There is one big difference though if we look at bytecode for <code>x</code> and <code>y</code>:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">x:
 
@@ -86,16 +86,16 @@
 
 y:
 
-  <span class="dv">24</span>: invokevirtual #<span class="dv">37</span>   <span class="co">// Method scala/Predef$.wrapIntArray:([I)Lscala/collection/mutable/WrappedArray;</span>
-  <span class="dv">27</span>: invokevirtual #<span class="dv">41</span>   <span class="co">// Method scala/collection/immutable/List$.apply:(Lscala/collection/Seq;)Lscala ...</span>
-  <span class="dv">30</span>: <span class="kw">new</span>           #<span class="dv">60</span>   <span class="co">// class Test$$anonfun$y$1</span>
+  <span class="dv">24</span>: invokevirtual #<span class="dv">36</span>   <span class="co">// Method scala/Predef$.wrapIntArray:([I)Lscala/collection/mutable/WrappedArray;</span>
+  <span class="dv">27</span>: invokevirtual #<span class="dv">40</span>   <span class="co">// Method scala/collection/immutable/List$.apply:(Lscala/collection/Seq;)Lscala ...</span>
+  <span class="dv">30</span>: <span class="kw">new</span>           #<span class="dv">59</span>   <span class="co">// class Test$$anonfun$y$1</span>
   <span class="dv">33</span>: dup
-  <span class="dv">34</span>: invokespecial #<span class="dv">61</span>   <span class="co">// Method Test$$anonfun$y$1.&quot;&lt;init&gt;&quot;:()V</span>
-  <span class="dv">37</span>: getstatic     #<span class="dv">33</span>   <span class="co">// Field scala/collection/immutable/List$.MODULE$:Lscala/collection/immutable/List$;</span>
-  <span class="dv">40</span>: invokevirtual #<span class="dv">47</span>   <span class="co">// Method scala/collection/immutable/List$.canBuildFrom:()Lscala/collection/generic ...</span>
-  <span class="dv">43</span>: invokevirtual #<span class="dv">53</span>   <span class="co">// Method scala/collection/immutable/List.map:(Lscala/Function1;Lscala/collection ...</span>
-  <span class="dv">46</span>: invokevirtual #<span class="dv">57</span>   <span class="co">// Method scala/Predef$.println:(Ljava/lang/Object;)V</span>
-  <span class="dv">49</span>: <span class="kw">return</span></code></pre></div>
+  <span class="dv">34</span>: aload_0
+  <span class="dv">35</span>: invokespecial #<span class="dv">63</span>   <span class="co">// Method Test$$anonfun$y$1.&quot;&lt;init&gt;&quot;:(LTest;)V</span>
+  <span class="dv">38</span>: getstatic     #<span class="dv">32</span>   <span class="co">// Field scala/collection/immutable/List$.MODULE$:Lscala/collection/immutable/List$;</span>
+  <span class="dv">41</span>: invokevirtual #<span class="dv">46</span>   <span class="co">// Method scala/collection/immutable/List$.canBuildFrom:()Lscala/collection/generic ...</span>
+  <span class="dv">44</span>: invokevirtual #<span class="dv">52</span>   <span class="co">// Method scala/collection/immutable/List.map:(Lscala/Function1;Lscala/collection ...</span>
+  <span class="dv">47</span>: invokevirtual #<span class="dv">56</span>   <span class="co">// Method scala/Predef$.println:(Ljava/lang/Object;)V</span></code></pre></div>
 <p>Every time I call <code>y</code> a <em>new</em> object of type <code>Test$$anonfun$y$1</code> is created and initialized! While in <code>x</code> nothing like this happens as <code>f</code> was instantiated when I assigned it to <code>f</code>, so the code simply calls <code>Test.f</code> to retrieve pre-initialized value.</p>
 <p>So given all this my suggestion would be to use explicit functions whenever higher-order functions/methods are involved and not rely on implicit conversions, and use methods in all other cases.</p>
 
