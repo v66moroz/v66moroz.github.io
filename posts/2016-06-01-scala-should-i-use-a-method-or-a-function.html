@@ -71,7 +71,7 @@
 <pre><code>Test$$anonfun$1.class  Test.classs</code></pre>
 <p>Nothing too interesting: our <code>Test</code> class and anonymous function <code>f</code> in <code>Test$$anonfun$1</code>. Now let’s return <code>def y</code> back:</p>
 <pre><code>Test$$anonfun$1.class  Test$$anonfun$y$1.class  Test.class</code></pre>
-<p>Wait, what is <code>Test$$anonfun$y$1</code>? When Scala sees a method in a functional context it defines anonymous function class (a class derived from <code>Function1</code> in this particular example), which has <code>apply</code> method, and that <code>apply</code> method simply calls <code>testInstance.m(...)</code> (<code>testInstance</code> is passed as an argument to anonymous function constructor so it can be used later). Almost the same thing happens with <code>f</code>, an anonimous class is created and <code>apply</code> method is defined. There is one big difference though if we look at bytecode for <code>x</code> and <code>y</code>:</p>
+<p>Wait, what is <code>Test$$anonfun$y$1</code>? When Scala sees a method in a functional context it defines anonymous function class (a class derived from <code>Function1</code> in this particular example), which has <code>apply</code> method, and that <code>apply</code> method simply calls <code>testInstance.m(...)</code> (<code>testInstance</code> is passed as an argument to anonymous function constructor so it can be used later). Almost the same thing happens with <code>f</code>, an anonimous function class is defined with a corresponding <code>apply</code> method. There is one big difference though if we look at bytecode for <code>x</code> and <code>y</code>:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">x:
 
   <span class="dv">24</span>: invokevirtual #<span class="dv">37</span>   <span class="co">// Method scala/Predef$.wrapIntArray:([I)Lscala/collection/mutable/WrappedArray;</span>
@@ -96,7 +96,7 @@ y:
   <span class="dv">41</span>: invokevirtual #<span class="dv">46</span>   <span class="co">// Method scala/collection/immutable/List$.canBuildFrom:()Lscala/collection/generic ...</span>
   <span class="dv">44</span>: invokevirtual #<span class="dv">52</span>   <span class="co">// Method scala/collection/immutable/List.map:(Lscala/Function1;Lscala/collection ...</span>
   <span class="dv">47</span>: invokevirtual #<span class="dv">56</span>   <span class="co">// Method scala/Predef$.println:(Ljava/lang/Object;)V</span></code></pre></div>
-<p>Every time I call <code>y</code> a <em>new</em> object of type <code>Test$$anonfun$y$1</code> is created and initialized! While in <code>x</code> nothing like this happens as <code>f</code> was instantiated when I assigned it to <code>f</code>, so the code simply calls <code>Test.f</code> to retrieve pre-initialized value.</p>
+<p>Every time I call <code>y</code> a <em>new</em> instance of class <code>Test$$anonfun$y$1</code> is created and initialized! While in <code>x</code> nothing like this happens as <code>f</code> was instantiated when I assigned it to <code>f</code>, so the code simply calls <code>this.f</code> to retrieve pre-initialized value.</p>
 <p>So given all this my suggestion would be to use explicit functions whenever higher-order functions/methods are involved and not rely on implicit conversions, and use methods in all other cases.</p>
 
         </div>
