@@ -96,7 +96,7 @@ y:
   <span class="dv">41</span>: invokevirtual #<span class="dv">46</span>   <span class="co">// Method scala/collection/immutable/List$.canBuildFrom:()Lscala/collection/generic ...</span>
   <span class="dv">44</span>: invokevirtual #<span class="dv">52</span>   <span class="co">// Method scala/collection/immutable/List.map:(Lscala/Function1;Lscala/collection ...</span>
   <span class="dv">47</span>: invokevirtual #<span class="dv">56</span>   <span class="co">// Method scala/Predef$.println:(Ljava/lang/Object;)V</span></code></pre></div>
-<p>Every time I call <code>y</code> a <em>new</em> instance of class <code>Test$$anonfun$y$1</code> is created and initialized! While in <code>x</code> nothing like this happens as <code>f</code> was instantiated when I assigned it to <code>f</code>, so the code simply calls <code>this.f</code> to retrieve pre-initialized value.</p>
+<p>Every time I call <code>y</code> a <em>new</em> instance of class <code>Test$$anonfun$y$1</code> is created and initialized! While in <code>x</code> nothing like this happens as anonymous function was instantiated when I declared <code>f</code>, so the code simply calls <code>this.f</code> to retrieve pre-initialized value.</p>
 <p>So given all this my suggestion would be to use explicit functions whenever higher-order functions/methods are involved and not rely on implicit conversions, and use methods in all other cases.</p>
 
         </div>
