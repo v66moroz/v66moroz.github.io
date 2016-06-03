@@ -72,7 +72,7 @@
 <p>Nothing too interesting: our <code>Test</code> class and anonymous function <code>f</code> in <code>Test$$anonfun$1</code>. Now let’s return <code>def y</code> back:</p>
 <pre><code>Test$$anonfun$1.class  Test$$anonfun$y$1.class  Test.class</code></pre>
 <p>Wait, what is <code>Test$$anonfun$y$1</code>? When Scala sees a method in a functional context it defines anonymous function class (a class derived from <code>Function1</code> in this particular example), which has <code>apply</code> method, and that <code>apply</code> method simply calls <code>testInstance.m(...)</code> (<code>testInstance</code> is passed as an argument to anonymous function constructor so it can be used later). Almost the same thing happens with <code>f</code>, an anonimous function class is defined with the corresponding <code>apply</code> method. There is one big difference though if we look at bytecode for <code>x</code> and <code>y</code>:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">x:
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java">x:
 
   <span class="dv">24</span>: invokevirtual #<span class="dv">37</span>   <span class="co">// Method scala/Predef$.wrapIntArray:([I)Lscala/collection/mutable/WrappedArray;</span>
   <span class="dv">27</span>: invokevirtual #<span class="dv">41</span>   <span class="co">// Method scala/collection/immutable/List$.apply:(Lscala/collection/Seq;)Lscala ...</span>
@@ -98,6 +98,61 @@ y:
   <span class="dv">47</span>: invokevirtual #<span class="dv">56</span>   <span class="co">// Method scala/Predef$.println:(Ljava/lang/Object;)V</span></code></pre></div>
 <p>Every time I call <code>y</code> a <em>new</em> instance of class <code>Test$$anonfun$y$1</code> is created and initialized! While in <code>x</code> nothing like this happens as anonymous function was instantiated when I declared <code>f</code>, so the code simply calls <code>this.f</code> to retrieve pre-initialized value.</p>
 <p>Given this my suggestion would be to use explicit functions whenever higher-order functions/methods are involved and not rely on implicit conversions, and use methods in all other cases.</p>
+<h4 id="update-scala-2.12-m4-and-java-8-labmdas">Update: Scala 2.12-M4 and Java 8 labmdas</h4>
+<p>Does it “no longer matter” with introduction of Scala 2.12 which compiles to Java 8 lambdas? Let’s look at Java 8 bytecode. The good part is that Scala 2.12 doesn’t create class definitions for anonymous functions, instead it’s using factories to create dynamic classes on the fly. At least JAR becomes smaller and loading potentially faster. Instead Scala creates methods in class <code>Test</code> which are called from a <code>Function1</code> object:</p>
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java">  <span class="co">// f</span>
+  <span class="kw">public</span> <span class="dt">static</span> <span class="dt">final</span> <span class="dt">int</span> Test$$$anonfun$<span class="dv">1</span>(<span class="dt">int</span>);
+
+    <span class="dv">0</span>: iload_0
+    <span class="dv">1</span>: iconst_1
+    <span class="dv">2</span>: iadd
+    <span class="dv">3</span>: ireturn
+
+  <span class="co">// wrapper for m</span>
+  <span class="kw">public</span> <span class="dt">final</span> <span class="dt">int</span> Test$$$anonfun$<span class="dv">2</span>(<span class="dt">int</span>);
+
+    <span class="dv">0</span>: aload_0
+    <span class="dv">1</span>: iload_1
+    <span class="dv">2</span>: invokevirtual #<span class="dv">86</span>  <span class="co">// Method m:(I)I</span>
+    <span class="dv">5</span>: ireturn</code></pre></div>
+<p>Compiler is smart enough to optimize out the instance of <code>Test</code> in the first case (i.e. the method is <code>static</code>) which saves it from passing an object reference in this particular case. Unfortunately in the second case <code>this</code> is required since we are going to call <code>m</code>. Let’s look how these functions are called:</p>
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java">  <span class="kw">public</span> <span class="fu">Test</span>();
+
+   <span class="dv">0</span>: aload_0
+   <span class="dv">1</span>: invokespecial #<span class="dv">89</span>     <span class="co">// Method java/lang/Object.&quot;&lt;init&gt;&quot;:()V</span>
+   <span class="dv">4</span>: aload_0
+   <span class="dv">5</span>: invokedynamic #<span class="dv">95</span>,  <span class="dv">0</span> <span class="co">// InvokeDynamic #1:apply$mcII$sp:()Lscala/runtime/java8/JFunction1$mcII$sp;</span>
+  <span class="dv">10</span>: putfield      #<span class="dv">25</span>     <span class="co">// Field f:Lscala/Function1;</span>
+  <span class="dv">13</span>: <span class="kw">return</span>
+
+  <span class="kw">public</span> <span class="dt">void</span> <span class="fu">x</span>();
+
+  ...
+  <span class="dv">24</span>: invokevirtual #<span class="dv">41</span>   <span class="co">// Method scala/Predef$.wrapIntArray:([I)Lscala/collection/mutable/WrappedArray;</span>
+  <span class="dv">27</span>: invokevirtual #<span class="dv">45</span>   <span class="co">// Method scala/collection/immutable/List$.apply:(Lscala/collection/Seq;)...</span>
+  <span class="dv">30</span>: aload_0
+  <span class="dv">31</span>: invokevirtual #<span class="dv">47</span>   <span class="co">// Method f:()Lscala/Function1;</span>
+  <span class="dv">34</span>: getstatic     #<span class="dv">37</span>   <span class="co">// Field scala/collection/immutable/List$.MODULE$:Lscala/collection/...</span></code></pre></div>
+<p>vs</p>
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java">  <span class="kw">public</span> <span class="dt">void</span> <span class="fu">y</span>();
+
+  <span class="dv">24</span>: invokevirtual #<span class="dv">41</span>     <span class="co">// Method scala/Predef$.wrapIntArray:([I)Lscala/collection/mutable/WrappedArray;</span>
+  <span class="dv">27</span>: invokevirtual #<span class="dv">45</span>     <span class="co">// Method scala/collection/immutable/List$.apply:(Lscala/collection/Seq;)...</span>
+  <span class="dv">30</span>: aload_0
+  <span class="dv">31</span>: invokedynamic #<span class="dv">83</span>,  <span class="dv">0</span> <span class="co">// InvokeDynamic #0:apply$mcII$sp:(LTest;)Lscala/runtime/java8/JFunction1$mcII$sp;</span>
+  <span class="dv">36</span>: getstatic     #<span class="dv">37</span>     <span class="co">// Field scala/collection/immutable/List$.MODULE$:Lscala/collection/immutable/List$;</span></code></pre></div>
+<p>First of all, what is this <code>invokedynamic</code> call? JVM is using a factory to create a lightweight object with <code>apply</code> method. Factory arguments look like this (for <code>f</code>):</p>
+<div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java">      #<span class="dv">70</span> (I)I
+      #<span class="dv">92</span> invokestatic Test.<span class="fu">Test</span>$$$anonfun$<span class="dv">1</span>:(I)I
+      #<span class="dv">70</span> (I)I
+      #<span class="dv">75</span> <span class="dv">3</span>
+      #<span class="dv">76</span> <span class="dv">1</span>
+      #<span class="dv">78</span> scala/Serializable
+      #<span class="dv">79</span> <span class="dv">0</span></code></pre></div>
+<p>Basically it tells JVM how to initialize an object. But <code>invokedymanic</code> is not just initializing the object, it <a href="http://stackoverflow.com/questions/30002380/why-are-java8-lambdas-invoked-using-invokedynamic">actually creates a code snippet based on the factory data and replaces <code>invokedynamic</code> with it</a> so it doesn’t need to touch the factory again. Well, it’s still not an object but inline code, so every type <code>invokedynamic</code> is called it will initialize a new lightweigth object with <code>apply</code> method. So the mechanism is the same as in 2.11, only lambdas are much lighter and don’t require full classes.</p>
+<p>What about those cycles? The difference is still there. <code>x</code> is simply using <code>f</code> initialized when constructing <code>Test</code> object. <code>y</code> is initializing lightweight anonymous function every time <code>y</code> is called, and also wrapping a call to <code>m</code> in another method, namely <code>Test$$$anonfun$2(int)</code>.</p>
+<p>Does it all really matter? Well, I wouldn’t be eager to replace methods used in higher-order method/functions in existing code (unless it’s in performance-crytical code like Spark, but even then benchmarks should probably be done first). But whenever I have a choice between two options and there is no other reason except for <em>historical</em> I would use functions.</p>
+<p>“Entities must not be multiplied beyond necessity” (c) Occam</p>
 
         </div>
 
