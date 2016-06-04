@@ -153,6 +153,44 @@ y:
 <p>What about those cycles? The difference is still there. <code>x</code> is simply using <code>f</code> initialized when constructing <code>Test</code> object. <code>y</code> is initializing lightweight anonymous function every time <code>y</code> is called, and also wrapping a call to <code>m</code> in another method, namely <code>Test$$$anonfun$2(int)</code>.</p>
 <p>Does it all really matter? Well, I wouldn’t be eager to replace methods used in higher-order method/functions in existing code (unless it’s in performance-crytical code like Spark, but even then benchmarks should probably be done first). But whenever I have a choice between two options and there is no other reason except for <em>historical</em> I would use functions.</p>
 <p>“Entities must not be multiplied beyond necessity” (c) Occam</p>
+<h3 id="update-performance">Update: Performance</h3>
+<p>Let’s do some simple benchmarking:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">class</span> Test {
+  <span class="kw">val</span> f = (x: Int) =&gt; x + <span class="dv">1</span>
+  <span class="kw">def</span> <span class="fu">m</span>(x: Int) = x + <span class="dv">1</span>
+
+  <span class="kw">def</span> x = (<span class="dv">1</span> to <span class="dv">1000</span>).<span class="fu">map</span>(f)
+  <span class="kw">def</span> y = (<span class="dv">1</span> to <span class="dv">1000</span>).<span class="fu">map</span>(m)
+}
+
+
+<span class="kw">object</span> Test {
+
+  <span class="kw">val</span> test = <span class="kw">new</span> Test
+  <span class="kw">val</span> samples = <span class="dv">10000</span>
+  <span class="kw">def</span> <span class="fu">sqr</span>(x: Double) = x * x
+
+  <span class="kw">def</span> <span class="fu">main</span>(args: Array[String]) = {
+
+    <span class="kw">val</span> results = Array.<span class="fu">fill</span>[Long](samples)(<span class="dv">0</span>)
+    <span class="kw">var</span> i = <span class="dv">0</span> 
+    <span class="kw">while</span>(i &lt; samples) {
+      <span class="kw">var</span> i2 = <span class="dv">0</span>
+      <span class="kw">val</span> t0 = System.<span class="fu">nanoTime</span>()
+      <span class="kw">while</span>(i2 &lt; <span class="dv">1000</span>) {
+        test.<span class="fu">x</span> <span class="co">// test.y</span>
+        i2 += <span class="dv">1</span>
+      }
+      <span class="fu">results</span>(i) = System.<span class="fu">nanoTime</span>() - t0
+      i += <span class="dv">1</span>
+    } 
+    <span class="fu">println</span>(s<span class="st">&quot;min=${results.min}&quot;</span>)
+  }
+}</code></pre></div>
+<p>Taking minimum will probably take into account warm-up and occasional GC. Let’s even run it 10 times and take minimum again. Here’s the result:</p>
+<pre><code>x: 6669954
+y: 6962329 (+4.4%)</code></pre>
+<p>Not much and it’s a special case, but still it’s noticeable.</p>
 
         </div>
 
