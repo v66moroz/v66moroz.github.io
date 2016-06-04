@@ -98,7 +98,7 @@ y:
   <span class="dv">47</span>: invokevirtual #<span class="dv">56</span>   <span class="co">// Method scala/Predef$.println:(Ljava/lang/Object;)V</span></code></pre></div>
 <p>Every time I call <code>y</code> a <em>new</em> instance of class <code>Test$$anonfun$y$1</code> is created and initialized! While in <code>x</code> nothing like this happens as anonymous function was instantiated when I declared <code>f</code>, so the code simply calls <code>this.f</code> to retrieve pre-initialized value.</p>
 <p>Given this my suggestion would be to use explicit functions whenever higher-order functions/methods are involved and not rely on implicit conversions, and use methods in all other cases.</p>
-<h4 id="update-scala-2.12-m4-and-java-8-labmdas">Update: Scala 2.12-M4 and Java 8 labmdas</h4>
+<h4 id="update-scala-2.12-m4-and-java-8-lambdas">Update: Scala 2.12-M4 and Java 8 lambdas</h4>
 <p>Does it “no longer matter” with introduction of Scala 2.12 which compiles to Java 8 lambdas? Let’s look at Java 8 bytecode. The good part is that Scala 2.12 doesn’t create class definitions for anonymous functions, instead it’s using factories to create dynamic classes on the fly. At least JAR becomes smaller and loading potentially faster. Instead Scala creates methods in class <code>Test</code> which are called from a <code>Function1</code> object:</p>
 <div class="sourceCode"><pre class="sourceCode java"><code class="sourceCode java">  <span class="co">// f</span>
   <span class="kw">public</span> <span class="dt">static</span> <span class="dt">final</span> <span class="dt">int</span> Test$$$anonfun$<span class="dv">1</span>(<span class="dt">int</span>);
