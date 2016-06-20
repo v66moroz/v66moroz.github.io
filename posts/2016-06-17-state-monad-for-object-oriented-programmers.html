@@ -248,7 +248,7 @@ Calc.<span class="fu">m3</span>(<span class="dv">1</span>, <span class="dv">2</s
         r2 &lt;- State(<span class="fu">m2</span>(r1, e))
       } <span class="kw">yield</span>(r2)
     }</code></pre></div>
-<p>This looks much better. Time to get rid of <code>State</code> here, for which we need to change <code>m0 .. m2</code> so they return <code>State</code> object instead of <code>Calc =&gt; Int</code>:</p>
+<p>This looks much better. Time to get rid of <code>State</code> here, for which we need to change <code>m0 .. m2</code> so they return a <code>State</code> object instead of <code>Calc =&gt; Int</code>:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">object</span> Calc {
   <span class="kw">import</span> Calc.<span class="fu">_</span>
 
@@ -301,9 +301,8 @@ Calc.<span class="fu">m3</span>(<span class="dv">1</span>, <span class="dv">2</s
 }
 
 Calc.<span class="fu">m3</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>).<span class="fu">runState</span>(<span class="kw">new</span> <span class="fu">Calc</span>(List[Int]())) <span class="co">//&gt; 70</span></code></pre></div>
-<p>At this point it’s easy to notice that we drag mutable state around and there is no particular reason why it should be mutable, we can always update state and pass new state forward. Also methods <code>push</code>, <code>pop</code>, <code>add</code>, <code>mul</code> don’t look special anymore, they are not that different from <code>m0</code>, <code>m1</code>, <code>m2</code>, <code>m3</code>. So let’s create improved version of class <code>State</code> and also implement those 4 methods. We can completely abandon <code>Calc</code> then since there is nothing left there except for <code>List[Int]</code>:</p>
+<p>At this point it’s easy to notice that we drag mutable state around and there is no particular reason why it should be mutable, we can always update state and pass a new state forward. Also methods <code>push</code>, <code>pop</code>, <code>add</code>, <code>mul</code> don’t look special anymore, they are not that different from <code>m0</code>, <code>m1</code>, <code>m2</code>, <code>m3</code>. So let’s create an improved version of class <code>State</code> and also implement those 4 methods. We can completely abandon the class <code>Calc</code> then since there is nothing left there except for <code>List[Int]</code>:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">object</span> Calc {
-  <span class="kw">import</span> Calc.<span class="fu">_</span>
 
   <span class="kw">case</span> <span class="kw">class</span> State[S, A](runState: S =&gt; (A, S)) {
     <span class="kw">def</span> flatMap[B](f: A =&gt; State[S, B]): State[S, B] = {
