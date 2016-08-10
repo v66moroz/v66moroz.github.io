@@ -1,0 +1,494 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <title>Victor Moroz - Using context bound and implicitly in Scala</title>
+        <link rel="stylesheet" type="text/css" href="../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../css/syntax.css" />
+        <script>
+            (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+            m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+            })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+            ga('create', 'UA-62008520-1', 'auto');
+            ga('send', 'pageview');
+        </script>
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../">Victor Moroz</a>
+            </div>
+            <div id="navigation">
+                |
+                <a href="../">Index</a>
+<!--             
+                <a href="/about.html">About</a>
+                <a href="/contact.html">Contact</a>
+                <a href="/archive.html">Archive</a>
+-->        
+            </div>
+            <div class="spacer">
+            </div>
+        </div>
+
+        <div id="content">
+            <h3>Using context bound and implicitly in Scala</h3>
+            <div class="info">
+    Posted on August  9, 2016
+    
+</div>
+
+<p>Let’s start from building a simple stack-based calculator using object-oriented approach. The calculator is represented by a stack of integers (<code>List[Int]</code>) and certain operations which modify the stack and can return a result.</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">class</span> <span class="fu">Calc</span>(<span class="kw">var</span> stack: List[Int]) {
+  <span class="kw">def</span> <span class="fu">push</span>(x: Int): Unit = {
+    stack = x::stack
+  }
+
+  <span class="kw">def</span> <span class="fu">pop</span>(): Int = {
+    <span class="kw">val</span> x::tail = stack
+    stack = tail
+    x
+  }
+
+  <span class="co">// s0 + s1</span>
+  <span class="kw">def</span> <span class="fu">add</span>(): Int = {
+    <span class="kw">val</span> a = <span class="fu">pop</span>()
+    <span class="kw">val</span> b = <span class="fu">pop</span>()
+    a + b
+  }
+
+  <span class="co">// s0 * s1</span>
+  <span class="kw">def</span> <span class="fu">mul</span>(): Int = {
+    <span class="kw">val</span> a = <span class="fu">pop</span>()
+    <span class="kw">val</span> b = <span class="fu">pop</span>()
+    a * b
+  }
+}
+
+<span class="kw">val</span> c = <span class="kw">new</span> <span class="fu">Calc</span>(List[Int]())
+c.<span class="fu">push</span>(<span class="dv">2</span>)
+c.<span class="fu">push</span>(<span class="dv">3</span>)
+c.<span class="fu">add</span>() <span class="co">//&gt; 5</span></code></pre></div>
+<p>Looks good so far, now I want to add a slightly more complex logic, I want to compute <code>(a * b + c * d)</code>, where <code>a, b, c, d</code> are the top 4 values in my stack. I have two options, one is to add the method to <code>Calc</code> class like this:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">  <span class="co">// s0 * s1 + s2 * s3</span>
+  <span class="kw">def</span> <span class="fu">m1</span>(): Int = {
+    <span class="kw">val</span> ab = <span class="fu">mul</span>()
+    <span class="kw">val</span> cd = <span class="fu">mul</span>()
+    <span class="fu">push</span>(ab)
+    <span class="fu">push</span>(cd)
+    <span class="fu">add</span>()
+  }</code></pre></div>
+<p>but I don’t want to pollute my clean and nice <code>Calc</code> class as this method can be specific to some part of my program, instead I want to create some temporary method (preferrably a function), so I can pass it around and combine with other functions:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">object</span> Calc {
+  <span class="kw">import</span> Calc.<span class="fu">_</span>
+
+  <span class="co">// s0 * s1 + s2 * s3</span>
+  <span class="kw">val</span> m1: Calc =&gt; Int = 
+    calc =&gt; {
+      <span class="kw">val</span> ab = calc.<span class="fu">mul</span>()
+      <span class="kw">val</span> cd = calc.<span class="fu">mul</span>()
+      calc.<span class="fu">push</span>(ab)
+      calc.<span class="fu">push</span>(cd)
+      calc.<span class="fu">add</span>()
+    }</code></pre></div>
+<p>Later I decided that I would need <code>(a * b + c * d) * e</code> too, and since I want to reuse my work I simply added more methods like the above. I also added <code>m0</code> to push 4 values to the stack in one shot:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">object</span> Calc {
+  <span class="kw">import</span> Calc.<span class="fu">_</span>
+
+  <span class="co">// (a, b, c, d) =&gt; (s0, s1, s2, s3)</span>
+  <span class="kw">val</span> m0: (Calc, Int, Int, Int, Int) =&gt; Int =
+    (calc, a, b, c, d) =&gt; {
+      calc.<span class="fu">push</span>(d)
+      calc.<span class="fu">push</span>(c)
+      calc.<span class="fu">push</span>(b)
+      calc.<span class="fu">push</span>(a)
+      <span class="dv">0</span>
+    }
+
+  <span class="co">// s0 * s1 + s2 * s3</span>
+  <span class="kw">val</span> m1: Calc =&gt; Int = 
+    calc =&gt; {
+      <span class="kw">val</span> ab = calc.<span class="fu">mul</span>()
+      <span class="kw">val</span> cd = calc.<span class="fu">mul</span>()
+      calc.<span class="fu">push</span>(ab)
+      calc.<span class="fu">push</span>(cd)
+      calc.<span class="fu">add</span>()
+    }
+
+  <span class="co">// x * e </span>
+  <span class="kw">val</span> m2: (Calc, Int, Int) =&gt; Int =
+    (calc, x, e) =&gt; {
+      calc.<span class="fu">push</span>(x)
+      calc.<span class="fu">push</span>(e)
+      calc.<span class="fu">mul</span>()
+    }
+
+  <span class="co">// (a * b + c * d) * e</span>
+  <span class="kw">val</span> m3: (Calc, Int, Int, Int, Int, Int) =&gt; Int =
+    (calc, a, b, c, d, e) =&gt; {
+      <span class="fu">m0</span>(calc, a, b, c, d)
+      <span class="kw">val</span> r1 = <span class="fu">m1</span>(calc)
+      <span class="fu">m2</span>(calc, r1, e)
+    }
+
+}
+
+Calc.<span class="fu">m3</span>(<span class="kw">new</span> <span class="fu">Calc</span>(List[Int]()), <span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>) <span class="co">//&gt; 70</span></code></pre></div>
+<p>Not too bad, but there is some annoying boilerplate, I need to repeat <code>calc.</code> every time I want to use <code>Calc</code> methods and explicitely lug state around. I would be great if I could only use method names and skip state alltogether. Let’s do some refactoring:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">object</span> Calc {
+  <span class="kw">import</span> Calc.<span class="fu">_</span>
+
+  <span class="co">// (a, b, c, d) =&gt; (s0, s1, s2, s3)</span>
+  <span class="kw">val</span> m0: (Int, Int, Int, Int) =&gt; (Calc =&gt; Int) =
+    (a, b, c, d) =&gt;
+      calc =&gt; {
+        calc.<span class="fu">push</span>(d)
+        calc.<span class="fu">push</span>(c)
+        calc.<span class="fu">push</span>(b)
+        calc.<span class="fu">push</span>(a)
+        <span class="dv">0</span>
+      }
+
+  <span class="co">// (s0 * s1 + s2 * s3)</span>
+  <span class="kw">val</span> m1: () =&gt; (Calc =&gt; Int) = 
+    () =&gt;
+      calc =&gt; {
+        <span class="kw">val</span> ab = calc.<span class="fu">mul</span>()
+        <span class="kw">val</span> cd = calc.<span class="fu">mul</span>()
+        calc.<span class="fu">push</span>(ab)
+        calc.<span class="fu">push</span>(cd)
+        calc.<span class="fu">add</span>()
+      }
+
+  <span class="co">// x * e</span>
+  <span class="kw">val</span> m2: (Int, Int) =&gt; (Calc =&gt; Int) =
+    (x, e) =&gt;
+      calc =&gt; {
+        calc.<span class="fu">push</span>(x)
+        calc.<span class="fu">push</span>(e)
+        calc.<span class="fu">mul</span>()
+      }
+
+  <span class="co">// (a * b + c * d) * e</span>
+  <span class="kw">val</span> m3: (Int, Int, Int, Int, Int) =&gt; (Calc =&gt; Int) =
+    (a, b, c, d, e) =&gt;
+      calc =&gt; {
+        <span class="fu">m0</span>(a, b, c, d)(calc)
+        <span class="kw">val</span> r1 = <span class="fu">m1</span>()(calc)
+        <span class="fu">m2</span>(r1, e)(calc)
+      }
+}
+
+Calc.<span class="fu">m3</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>)(<span class="kw">new</span> <span class="fu">Calc</span>(List[Int]())) <span class="co">//&gt; 70</span></code></pre></div>
+<p>Not much better, but at least state is passed separately now, so maybe there is a chance to conceal it. The goal is to be able to write something like this:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">  <span class="kw">val</span> m3: (Int, Int, Int, Int, Int) =&gt; ??? = {
+    (a, b, c, d, e) =&gt;
+      <span class="fu">bind</span>( <span class="fu">m0</span>(a, b, c, d), { _ =&gt;
+        <span class="fu">bind</span>( <span class="fu">m1</span>(), { r1 =&gt; 
+          <span class="fu">m2</span>(r1, e)
+        })
+      })
+  }</code></pre></div>
+<p>Looking at the last refactoring it seems that <code>???</code> could be <code>Calc =&gt; Int</code>. Let’s try to define <code>bind</code> as:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">  <span class="kw">def</span> <span class="fu">bind</span>(f1: Calc =&gt; Int, f2: Int =&gt; (Calc =&gt; Int)): Calc =&gt; Int = 
+    calc =&gt; {
+      <span class="kw">val</span> r1 = <span class="fu">f1</span>(calc)
+      <span class="fu">f2</span>(r1)(calc)
+    }</code></pre></div>
+<p>Now that we defined <code>bind</code> we can write:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">  <span class="kw">val</span> m3: (Int, Int, Int, Int, Int) =&gt; (Calc =&gt; Int) = 
+    (a, b, c, d, e) =&gt; {
+      <span class="fu">bind</span>(<span class="fu">m0</span>(a, b, c, d), { _ =&gt;
+        <span class="fu">bind</span>(<span class="fu">m1</span>(), { r1 =&gt; 
+          <span class="fu">m2</span>(r1, e)
+        })
+      })
+    }</code></pre></div>
+<p>Still ugly, but state is concealed at least. This notation can be improved by using Scala <code>for</code> comprehensions. Only <code>for</code> comprehensions require <code>flatMap</code> and <code>map</code> to be defined as methods of <code>Calc =&gt; Int</code>, which we can’t do. The solution is to create a wrapper:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">  <span class="kw">case</span> <span class="kw">class</span> State[S, A](runState: S =&gt; A) {
+    <span class="kw">def</span> <span class="fu">flatMap</span>(f: A =&gt; State[S, A]): State[S, A] = {
+      State(
+        s =&gt; {
+          <span class="kw">val</span> r = <span class="fu">runState</span>(s)
+          <span class="fu">f</span>(r).<span class="fu">runState</span>(s)
+        }
+      )
+    }
+
+    <span class="kw">def</span> <span class="fu">map</span>(f: A =&gt; A): State[S, A] = {
+      State(
+        s =&gt; {
+          <span class="kw">val</span> r = <span class="fu">runState</span>(s)
+          <span class="fu">f</span>(r)
+        }
+      )
+    }
+  }
+
+  <span class="kw">val</span> m3: (Int, Int, Int, Int, Int) =&gt; State[Calc, Int] = 
+    (a, b, c, d, e) =&gt; {
+      State(<span class="fu">m0</span>(a, b, c, d)).<span class="fu">flatMap</span> { _ =&gt;
+        State(<span class="fu">m1</span>()).<span class="fu">flatMap</span> { r =&gt; 
+          State(<span class="fu">m2</span>(r, e))
+        }
+      }
+    }</code></pre></div>
+<p>Which can also be written as:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">
+  ...
+
+  <span class="kw">val</span> m3: (Int, Int, Int, Int, Int) =&gt; State[Calc, Int] =
+    (a, b, c, d, e) =&gt; {
+      <span class="kw">for</span> {
+        _ &lt;-  State(<span class="fu">m0</span>(a, b, c, d))
+        r1 &lt;- State(<span class="fu">m1</span>())
+        r2 &lt;- State(<span class="fu">m2</span>(r1, e))
+      } <span class="kw">yield</span>(r2)
+    }</code></pre></div>
+<p>This looks much better. Time to get rid of <code>State</code> here, for which we need to change <code>m0 .. m2</code> so they return a <code>State</code> object instead of <code>Calc =&gt; Int</code>:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">object</span> Calc {
+  <span class="kw">import</span> Calc.<span class="fu">_</span>
+
+  <span class="co">// (a, b, c, d) =&gt; (s0, s1, s2, s3)</span>
+  <span class="kw">val</span> m0: (Int, Int, Int, Int) =&gt; State[Calc, Int] =
+    (a, b, c, d) =&gt;
+      State(
+        calc =&gt; {
+          calc.<span class="fu">push</span>(d)
+          calc.<span class="fu">push</span>(c)
+          calc.<span class="fu">push</span>(b)
+          calc.<span class="fu">push</span>(a)
+          <span class="dv">0</span>
+        }
+      )
+
+  <span class="co">// s0 * s1 + s2 * s3</span>
+  <span class="kw">val</span> m1: () =&gt; State[Calc, Int] = 
+    () =&gt;
+      State(
+        calc =&gt; {
+          <span class="kw">val</span> ab = calc.<span class="fu">mul</span>()
+          <span class="kw">val</span> cd = calc.<span class="fu">mul</span>()
+          calc.<span class="fu">push</span>(ab)
+          calc.<span class="fu">push</span>(cd)
+          calc.<span class="fu">add</span>()
+        }
+    )
+
+  <span class="co">// e * s0</span>
+  <span class="kw">val</span> m2: (Int, Int) =&gt; State[Calc, Int] =
+    (x, e) =&gt;
+      State(
+        calc =&gt; {
+          calc.<span class="fu">push</span>(x)
+          calc.<span class="fu">push</span>(e)
+          calc.<span class="fu">mul</span>()
+        }
+      )
+
+  <span class="co">// (a * b + c * d) * e</span>
+  <span class="kw">val</span> m3: (Int, Int, Int, Int, Int) =&gt; State[Calc, Int] =
+    (a, b, c, d, e) =&gt; {
+      <span class="kw">for</span> {
+        _ &lt;-  <span class="fu">m0</span>(a, b, c, d)
+        r1 &lt;- <span class="fu">m1</span>()
+        r2 &lt;- <span class="fu">m2</span>(r1, e)
+      } <span class="kw">yield</span>(r2)
+    }
+}
+
+Calc.<span class="fu">m3</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>).<span class="fu">runState</span>(<span class="kw">new</span> <span class="fu">Calc</span>(List[Int]())) <span class="co">//&gt; 70</span></code></pre></div>
+<p>At this point it’s easy to notice that we drag mutable state around and there is no particular reason why it should be mutable, we can always update state and pass a new state forward. Also methods <code>push</code>, <code>pop</code>, <code>add</code>, <code>mul</code> don’t look special anymore, they are not that different from <code>m0</code>, <code>m1</code>, <code>m2</code>, <code>m3</code>. So let’s create an improved version of class <code>State</code> and also implement those 4 methods. We can completely abandon the class <code>Calc</code> then since there is nothing left there except for <code>List[Int]</code>:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">object</span> Calc {
+
+  <span class="kw">case</span> <span class="kw">class</span> State[S, A](runState: S =&gt; (A, S)) {
+    <span class="kw">def</span> flatMap[B](f: A =&gt; State[S, B]): State[S, B] = {
+      State(
+        s =&gt; {
+          <span class="kw">val</span> (r, newState) = <span class="fu">runState</span>(s)
+          <span class="fu">f</span>(r).<span class="fu">runState</span>(newState)
+        }
+      )
+    }
+
+    <span class="kw">def</span> map[B](f: A =&gt; B): State[S, B] =
+      flatMap { x =&gt; State.<span class="fu">unit</span>(<span class="fu">f</span>(x)) }
+
+    <span class="kw">def</span> <span class="fu">getResult</span>(s: S) = <span class="fu">runState</span>(s).<span class="fu">_1</span>
+  }
+
+  <span class="kw">object</span> State {
+    <span class="kw">def</span> <span class="dt">unit</span>[S, A](x: A): State[S, A] =
+      State((x, _))
+  }
+
+  <span class="kw">val</span> push: Int =&gt; State[List[Int], Unit] = 
+    x =&gt; State(s =&gt; ((), x::s))
+
+  <span class="kw">val</span> pop: () =&gt; State[List[Int], Int] =
+    () =&gt; State { <span class="kw">case</span> (x::xs) =&gt; (x, xs) }
+
+  <span class="kw">val</span> add: () =&gt; State[List[Int], Int] = 
+    () =&gt; State { <span class="kw">case</span> (a::b::xs) =&gt; (a + b, xs) }
+
+  <span class="kw">val</span> mul: () =&gt; State[List[Int], Int] = 
+    () =&gt; State { <span class="kw">case</span> (a::b::xs) =&gt; (a * b, xs) }
+
+  <span class="co">// (a, b, c, d) =&gt; (s0, s1, s2, s3)</span>
+  <span class="kw">val</span> m0: (Int, Int, Int, Int) =&gt; State[List[Int], Unit] =
+    (a, b, c, d) =&gt;
+      <span class="kw">for</span> {
+        _ &lt;- <span class="fu">push</span>(d)
+        _ &lt;- <span class="fu">push</span>(c)
+        _ &lt;- <span class="fu">push</span>(b)
+        _ &lt;- <span class="fu">push</span>(a)
+      } <span class="kw">yield</span>(())
+
+  <span class="co">// s0 * s1 + s2 * s3</span>
+  <span class="kw">val</span> m1: () =&gt; State[List[Int], Int] =
+    () =&gt;
+      <span class="kw">for</span> {
+        ab &lt;- <span class="fu">mul</span>()
+        cd &lt;- <span class="fu">mul</span>()
+        _ &lt;- <span class="fu">push</span>(ab)
+        _ &lt;- <span class="fu">push</span>(cd)
+        s &lt;- <span class="fu">add</span>()
+      } <span class="kw">yield</span>(s)
+
+  <span class="co">// e * s0</span>
+  <span class="kw">val</span> m2: (Int, Int) =&gt; State[List[Int], Int] =
+    (x, e) =&gt;
+      <span class="kw">for</span> {
+        _ &lt;- <span class="fu">push</span>(x)
+        _ &lt;- <span class="fu">push</span>(e)
+        p &lt;- <span class="fu">mul</span>()
+      } <span class="kw">yield</span>(p)
+
+  <span class="co">// (a * b + c * d) * e</span>
+  <span class="kw">val</span> m3: (Int, Int, Int, Int, Int) =&gt; State[List[Int], Int] =
+    (a, b, c, d, e) =&gt; {
+      <span class="kw">for</span> {
+        _ &lt;-  <span class="fu">m0</span>(a, b, c, d)
+        r1 &lt;- <span class="fu">m1</span>()
+        r2 &lt;- <span class="fu">m2</span>(r1, e)
+      } <span class="kw">yield</span>(r2)
+    }
+}
+
+Calc.<span class="fu">m3</span>(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>).<span class="fu">getResult</span>(Nil) <span class="co">//&gt; 70</span></code></pre></div>
+<p>Class <code>State[S, A]</code> is called State monad in functional programming. Let’s look at the benefits:</p>
+<ol style="list-style-type: decimal">
+<li><p>New methods are easily composable, good for code reuse.</p></li>
+<li><p>We started from an attempt to get rid of a boilerplate:</p></li>
+</ol>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="co">// Before</span>
+<span class="kw">val</span> m1: () =&gt; (Calc =&gt; Int) = 
+  () =&gt;
+    calc =&gt; {
+      <span class="kw">val</span> ab = calc.<span class="fu">mul</span>()
+      <span class="kw">val</span> cd = calc.<span class="fu">mul</span>()
+      calc.<span class="fu">push</span>(ab)
+      calc.<span class="fu">push</span>(cd)
+      calc.<span class="fu">add</span>()
+    }
+
+<span class="co">// After</span>
+<span class="kw">val</span> m1: () =&gt; State[List[Int], Int] =
+  () =&gt;
+    <span class="kw">for</span> {
+      ab &lt;- <span class="fu">mul</span>()
+      cd &lt;- <span class="fu">mul</span>()
+      _ &lt;- <span class="fu">push</span>(ab)
+      _ &lt;- <span class="fu">push</span>(cd)
+      s &lt;- <span class="fu">add</span>()
+    } <span class="kw">yield</span>(s)</code></pre></div>
+<p>I would argue the latter is more readable and less error prone, repeating <code>calc.</code> in the former snippet simply creates a visual noise. So State monad provides a good way to build DSL-like composition.</p>
+<ol start="3" style="list-style-type: decimal">
+<li>Immutable state. Not sure it brings much here since state is concealed and harder to mess up with.</li>
+</ol>
+<p>We can easily apply other monadic concepts here, e.g. <code>traverse</code>:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">  <span class="kw">object</span> State {
+    ...
+
+    <span class="kw">def</span> traverse[S, A, B](la: List[A])(f: A =&gt; State[S, B]): State[S, List[B]] =
+      State(
+        s =&gt; {
+          <span class="kw">val</span> (bs, newS) =
+            la.<span class="fu">foldLeft</span>((collection.<span class="fu">mutable</span>.<span class="fu">ListBuffer</span>[B](), s)) { <span class="kw">case</span> ((bs, s), a) =&gt; 
+              <span class="kw">val</span> (r, newS) = <span class="fu">f</span>(a).<span class="fu">runState</span>(s)
+              (bs :+ r, newS)
+            }
+          (bs.<span class="fu">toList</span>, newS)
+        }
+      )
+  }</code></pre></div>
+<p>With <code>traverse</code> code becomes even shorter:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">  <span class="co">// Before</span>
+
+  <span class="kw">val</span> push: Int =&gt; State[List[Int], Unit] = 
+    x =&gt; State(s =&gt; ((), x::s))
+
+  <span class="kw">val</span> m0: (Int, Int, Int, Int) =&gt; State[List[Int], Unit] =
+    (a, b, c, d) =&gt;
+      <span class="kw">for</span> {
+        _ &lt;- <span class="fu">push</span>(d)
+        _ &lt;- <span class="fu">push</span>(c)
+        _ &lt;- <span class="fu">push</span>(b)
+        _ &lt;- <span class="fu">push</span>(a)
+      } <span class="kw">yield</span>(())
+
+  <span class="co">// s0 * s1 + s2 * s3</span>
+  <span class="kw">val</span> m1: () =&gt; State[List[Int], Int] =
+    () =&gt;
+      <span class="kw">for</span> {
+        ab &lt;- <span class="fu">mul</span>()
+        cd &lt;- <span class="fu">mul</span>()
+        _ &lt;- <span class="fu">push</span>(ab)
+        _ &lt;- <span class="fu">push</span>(cd)
+        s &lt;- <span class="fu">add</span>()
+      } <span class="kw">yield</span>(s)
+
+  ...
+
+
+  <span class="co">// After</span>
+  <span class="kw">val</span> push: (Int*) =&gt; State[List[Int], List[Unit]] = 
+    (xs) =&gt;
+      State.<span class="fu">traverse</span>(xs.<span class="fu">toList</span>)(x =&gt; State(s =&gt; ((), x::s)))
+
+  <span class="co">// s0 * s1 + s2 * s3</span>
+  <span class="kw">val</span> m1: () =&gt; State[List[Int], Int] =
+    () =&gt;
+      <span class="kw">for</span> {
+        ab &lt;- <span class="fu">mul</span>()
+        cd &lt;- <span class="fu">mul</span>()
+        _ &lt;- <span class="fu">push</span>(ab, cd)
+        s &lt;- <span class="fu">add</span>()
+      } <span class="kw">yield</span>(s)</code></pre></div>
+
+        </div>
+
+        
+            <div id="disqus_thread"></div>
+            <script type="text/javascript">
+                var disqus_shortname = 'blog-vmoroz-com';
+                var disqus_identifier = '0f8039cc-dcfd-4a93-ac15-f4d25db6da4a';
+                
+                (function() {
+                    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+                    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+                    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+                })();
+            </script>
+            <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+        
+
+        <div id="footer">
+            Generated by
+            <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+    </body>
+</html>
