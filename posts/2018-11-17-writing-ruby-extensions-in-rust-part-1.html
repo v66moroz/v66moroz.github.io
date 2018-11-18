@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <title>Victor Moroz - Writing Ruby extensions in Rust: Part 1</title>
+        <link rel="stylesheet" type="text/css" href="../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../css/syntax.css" />
+        <script>
+            (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+            m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+            })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+            ga('create', 'UA-62008520-1', 'auto');
+            ga('send', 'pageview');
+        </script>
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../">Victor Moroz</a>
+            </div>
+            <div id="navigation">
+                |
+                <a href="../">Index</a>
+<!--             
+                <a href="/about.html">About</a>
+                <a href="/contact.html">Contact</a>
+                <a href="/archive.html">Archive</a>
+-->        
+            </div>
+            <div class="spacer">
+            </div>
+        </div>
+
+        <div id="content">
+            <h3>Writing Ruby extensions in Rust: Part 1</h3>
+            <div class="info">
+    Posted on November 17, 2018
+    
+</div>
+
+<p>Ruby is not known for its performance, and rewriting the whole application in a faster language is rarely an option in the real world. What to do if there are few bottlenecks in otherwise reasonably fast code? Native extensions to the rescue! Usually native extensions are written in C and there are some good tutorials, e.g. <a href="http://tristanpenman.com/blog/posts/2018/08/29/writing-a-gem-with-native-extensions/">this one</a>. But C code like below looks … scary?</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><a class="sourceLine" id="cb1-1" title="1"><span class="pp">#include </span><span class="im">&lt;ruby.h&gt;</span></a>
+<a class="sourceLine" id="cb1-2" title="2"><span class="pp">#include </span><span class="im">&lt;libclipboard.h&gt;</span></a>
+<a class="sourceLine" id="cb1-3" title="3"><span class="pp">#include </span><span class="im">&quot;extconf.h&quot;</span></a>
+<a class="sourceLine" id="cb1-4" title="4"></a>
+<a class="sourceLine" id="cb1-5" title="5"><span class="dt">static</span> clipboard_c *cb = NULL;</a>
+<a class="sourceLine" id="cb1-6" title="6"></a>
+<a class="sourceLine" id="cb1-7" title="7">VALUE set_text(VALUE _self, VALUE val) {</a>
+<a class="sourceLine" id="cb1-8" title="8">    Check_Type(val, T_STRING);</a>
+<a class="sourceLine" id="cb1-9" title="9">    VALUE result = Qnil;</a>
+<a class="sourceLine" id="cb1-10" title="10">    <span class="dt">char</span> *text = clipboard_text(cb);</a>
+<a class="sourceLine" id="cb1-11" title="11">    <span class="cf">if</span> (NULL != text) {</a>
+<a class="sourceLine" id="cb1-12" title="12">        result = rb_str_new(text, strlen(text));</a>
+<a class="sourceLine" id="cb1-13" title="13">        free(text);</a>
+<a class="sourceLine" id="cb1-14" title="14">    }</a>
+<a class="sourceLine" id="cb1-15" title="15">    <span class="cf">if</span> (false == clipboard_set_text(cb, StringValueCStr(val))) {</a>
+<a class="sourceLine" id="cb1-16" title="16">        rb_raise(rb_eRuntimeError, <span class="st">&quot;Failed to write to clipboard.&quot;</span>);</a>
+<a class="sourceLine" id="cb1-17" title="17">    }</a>
+<a class="sourceLine" id="cb1-18" title="18">    <span class="cf">return</span> result;</a>
+<a class="sourceLine" id="cb1-19" title="19">}</a>
+<a class="sourceLine" id="cb1-20" title="20"></a>
+<a class="sourceLine" id="cb1-21" title="21">VALUE get_text(VALUE _self) {</a>
+<a class="sourceLine" id="cb1-22" title="22">    VALUE result = Qnil;</a>
+<a class="sourceLine" id="cb1-23" title="23">    <span class="dt">char</span> *text = clipboard_text(cb);</a>
+<a class="sourceLine" id="cb1-24" title="24">    <span class="cf">if</span> (NULL != text) {</a>
+<a class="sourceLine" id="cb1-25" title="25">        result = rb_str_new(text, strlen(text));</a>
+<a class="sourceLine" id="cb1-26" title="26">        free(text);</a>
+<a class="sourceLine" id="cb1-27" title="27">    }</a>
+<a class="sourceLine" id="cb1-28" title="28">    <span class="cf">return</span> result;</a>
+<a class="sourceLine" id="cb1-29" title="29">}</a>
+<a class="sourceLine" id="cb1-30" title="30"></a>
+<a class="sourceLine" id="cb1-31" title="31"><span class="dt">void</span> Init_simple_clipboard() {</a>
+<a class="sourceLine" id="cb1-32" title="32">    cb = clipboard_new(NULL);</a>
+<a class="sourceLine" id="cb1-33" title="33">    <span class="cf">if</span> (NULL == cb) {</a>
+<a class="sourceLine" id="cb1-34" title="34">        rb_raise(rb_eRuntimeError, <span class="st">&quot;Failed to create clipboard context.&quot;</span>);</a>
+<a class="sourceLine" id="cb1-35" title="35">    }</a>
+<a class="sourceLine" id="cb1-36" title="36">    VALUE mod = rb_define_module(<span class="st">&quot;SimpleClipboard&quot;</span>);</a>
+<a class="sourceLine" id="cb1-37" title="37">    rb_define_module_function(mod, <span class="st">&quot;get_text&quot;</span>, get_text, <span class="dv">0</span>);</a>
+<a class="sourceLine" id="cb1-38" title="38">    rb_define_module_function(mod, <span class="st">&quot;set_text&quot;</span>, set_text, <span class="dv">1</span>);</a>
+<a class="sourceLine" id="cb1-39" title="39">}</a></code></pre></div>
+<p>Is it possible to avoid at least some of the boilerplate and maybe use a slighty more modern language than C? One possibility is to use Rust and <a href="https://usehelix.com/">helix</a>. Let’s create simple gem from scratch. I assume that Ruby and <code>bundler</code> are already installed (if you prefer system Ruby you will need <code>ruby-dev</code> package (Ubuntu) or similar for your system). We also need to install <a href="https://www.rust-lang.org/">Rust</a>:</p>
+<p><code>curl https://sh.rustup.rs -sSf | sh</code></p>
+<p>Let’s start from creating gem template:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><a class="sourceLine" id="cb2-1" title="1">$ <span class="ex">bundle</span> gem helix_csv</a>
+<a class="sourceLine" id="cb2-2" title="2"></a>
+<a class="sourceLine" id="cb2-3" title="3"><span class="ex">...</span></a>
+<a class="sourceLine" id="cb2-4" title="4"></a>
+<a class="sourceLine" id="cb2-5" title="5">$ <span class="bu">cd</span> helix_csv</a></code></pre></div>
+<p>I chose name <code>helix_csv</code> for a reason. Later I plan to convert this gem to fast CSV parser. After fixing <code>helix_csv.gemspec</code> TODOs to make <code>bundler</code> happy we need to add <code>helix</code> dependency:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode gemspec"><code class="sourceCode ruby"><a class="sourceLine" id="cb3-1" title="1">  spec.add_runtime_dependency <span class="st">&quot;helix_runtime&quot;</span>, <span class="st">&quot;= 0.7.5&quot;</span></a></code></pre></div>
+<p>and then run <code>bundle install --path=vendor/bundle</code> to install required gems. Next we need to replace <code>Rakefile</code> content with something like this:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb4-1" title="1">require <span class="st">'bundler/setup'</span></a>
+<a class="sourceLine" id="cb4-2" title="2">require <span class="st">'helix_runtime/build_task'</span></a>
+<a class="sourceLine" id="cb4-3" title="3"></a>
+<a class="sourceLine" id="cb4-4" title="4"><span class="dt">HelixRuntime</span>::<span class="dt">BuildTask</span>.new <span class="kw">do</span> |t|</a>
+<a class="sourceLine" id="cb4-5" title="5"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb4-6" title="6"></a>
+<a class="sourceLine" id="cb4-7" title="7">task <span class="st">:default</span> =&gt; <span class="st">:build</span></a></code></pre></div>
+<p>This will add tasks necessary to compile Rust code. Let’s add Rust template:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode bash"><code class="sourceCode bash"><a class="sourceLine" id="cb5-1" title="1">$ <span class="ex">cargo</span> init --lib</a></code></pre></div>
+<p><code>cargo</code> for Rust is what <code>bundler</code> is for Ruby and much more. This command will create <code>Cargo.toml</code> (which is Rust’s equivalent of <code>Gemfile</code>) and Rust code template in <code>src/lib.rs</code>. We need to add <code>[lib]</code> section to <code>Cargo.toml</code> since we need dynamic system library:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode conf"><code class="sourceCode ini"><a class="sourceLine" id="cb6-1" title="1"><span class="kw">[lib]</span></a>
+<a class="sourceLine" id="cb6-2" title="2"><span class="dt">crate-type </span><span class="ot">=</span><span class="st"> [&quot;cdylib&quot;]</span></a></code></pre></div>
+<p>and <code>helix</code> to the <code>[dependencies]</code> section:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode conf"><code class="sourceCode ini"><a class="sourceLine" id="cb7-1" title="1"><span class="kw">[dependencies]</span></a>
+<a class="sourceLine" id="cb7-2" title="2"><span class="dt">helix </span><span class="ot">=</span><span class="st"> &quot;</span><span class="dv">0</span><span class="st">.</span><span class="fl">7.5</span><span class="st">&quot;</span></a></code></pre></div>
+<p>Before we can start writing Rust code we need to create a glue between Ruby and Rust in <code>lib/helix_csv.rb</code> by adding this two lines to the top of that file:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb8-1" title="1">require <span class="st">'helix_runtime'</span></a>
+<a class="sourceLine" id="cb8-2" title="2">require <span class="st">'helix_csv/native'</span></a></code></pre></div>
+<p>Now we can finally write gem code. Let’s replace contenct of <code>src/lib.rs</code> with:</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode rust"><code class="sourceCode rust"><a class="sourceLine" id="cb9-1" title="1"><span class="at">#[</span>macro_use<span class="at">]</span></a>
+<a class="sourceLine" id="cb9-2" title="2"><span class="kw">extern</span> <span class="kw">crate</span> helix;</a>
+<a class="sourceLine" id="cb9-3" title="3"></a>
+<a class="sourceLine" id="cb9-4" title="4"><span class="pp">ruby!</span> <span class="op">{</span></a>
+<a class="sourceLine" id="cb9-5" title="5">    class HelixCSV <span class="op">{</span></a>
+<a class="sourceLine" id="cb9-6" title="6">        <span class="kw">struct</span> <span class="op">{</span></a>
+<a class="sourceLine" id="cb9-7" title="7">            n: <span class="dt">i64</span>,</a>
+<a class="sourceLine" id="cb9-8" title="8">        <span class="op">}</span></a>
+<a class="sourceLine" id="cb9-9" title="9"></a>
+<a class="sourceLine" id="cb9-10" title="10">        def initialize(helix, n: <span class="dt">i64</span>) <span class="op">{</span></a>
+<a class="sourceLine" id="cb9-11" title="11">            HelixCSV <span class="op">{</span> helix, n <span class="op">}</span></a>
+<a class="sourceLine" id="cb9-12" title="12">        <span class="op">}</span></a>
+<a class="sourceLine" id="cb9-13" title="13"></a>
+<a class="sourceLine" id="cb9-14" title="14">        def n(&amp;<span class="kw">self</span>) -&gt; <span class="dt">i64</span> <span class="op">{</span></a>
+<a class="sourceLine" id="cb9-15" title="15">            <span class="kw">self</span>.n</a>
+<a class="sourceLine" id="cb9-16" title="16">        <span class="op">}</span></a>
+<a class="sourceLine" id="cb9-17" title="17"></a>
+<a class="sourceLine" id="cb9-18" title="18">        def add(&amp;<span class="kw">mut</span> <span class="kw">self</span>, m: <span class="dt">i64</span>) -&gt; <span class="dt">i64</span> <span class="op">{</span></a>
+<a class="sourceLine" id="cb9-19" title="19">            <span class="kw">self</span>.n += m;</a>
+<a class="sourceLine" id="cb9-20" title="20">            <span class="kw">self</span>.n</a>
+<a class="sourceLine" id="cb9-21" title="21">        <span class="op">}</span></a>
+<a class="sourceLine" id="cb9-22" title="22">    <span class="op">}</span></a>
+<a class="sourceLine" id="cb9-23" title="23"><span class="op">}</span></a></code></pre></div>
+<p>To build extension we can either run <code>rake build</code> or just <code>rake</code> since default target is <code>build</code> anyway:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode bash"><code class="sourceCode bash"><a class="sourceLine" id="cb10-1" title="1">$ <span class="ex">rake</span></a>
+<a class="sourceLine" id="cb10-2" title="2">{}</a>
+<a class="sourceLine" id="cb10-3" title="3"><span class="ex">cargo</span> rustc --release -- -C link-args=-Wl,-undefined,dynamic_lookup</a>
+<a class="sourceLine" id="cb10-4" title="4">    <span class="ex">Updating</span> crates.io index</a>
+<a class="sourceLine" id="cb10-5" title="5">   <span class="ex">Compiling</span> libcruby-sys v0.7.5</a>
+<a class="sourceLine" id="cb10-6" title="6">   <span class="ex">Compiling</span> libc v0.2.43</a>
+<a class="sourceLine" id="cb10-7" title="7">   <span class="ex">Compiling</span> cstr-macro v0.1.0</a>
+<a class="sourceLine" id="cb10-8" title="8">   <span class="ex">Compiling</span> helix v0.7.5</a>
+<a class="sourceLine" id="cb10-9" title="9">   <span class="ex">Compiling</span> helix_csv v0.1.0 (.../helix_csv)                  </a>
+<a class="sourceLine" id="cb10-10" title="10">    <span class="ex">Finished</span> release [optimized] target(s) <span class="kw">in</span> <span class="ex">8.50s</span>    </a></code></pre></div>
+<p>Bundler has already created <code>bin/console</code> which will load our gem, so we can do some testing:</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb11-1" title="1">$ bin/console</a>
+<a class="sourceLine" id="cb11-2" title="2"><span class="fl">2.5</span>.<span class="dv">3</span> :<span class="dv">001</span> &gt; helix_csv = <span class="dt">HelixCSV</span>.new(<span class="dv">1</span>)</a>
+<a class="sourceLine" id="cb11-3" title="3"> =&gt; <span class="co">#&lt;HelixCSV:0x00005587b6c562a8&gt; </span></a>
+<a class="sourceLine" id="cb11-4" title="4"><span class="fl">2.5</span>.<span class="dv">3</span> :<span class="dv">002</span> &gt; helix_csv.n</a>
+<a class="sourceLine" id="cb11-5" title="5"> =&gt; <span class="dv">1</span> </a>
+<a class="sourceLine" id="cb11-6" title="6"><span class="fl">2.5</span>.<span class="dv">3</span> :<span class="dv">003</span> &gt; helix_csv.add(<span class="dv">4</span>)</a>
+<a class="sourceLine" id="cb11-7" title="7"> =&gt; <span class="dv">5</span> </a>
+<a class="sourceLine" id="cb11-8" title="8"><span class="fl">2.5</span>.<span class="dv">3</span> :<span class="dv">004</span> &gt; helix_csv.n</a>
+<a class="sourceLine" id="cb11-9" title="9"> =&gt; <span class="dv">5</span> </a></code></pre></div>
+<p>Not terribly interesting gem, but it works! We can’t package the gem yet as <code>gem install</code> needs to build native extension and we need to instruct <code>gem</code> how to do it. It’s not very complicated though, we only need to add <code>extconf.rb</code> to the root of our gem. The purpose of this script is to create <code>Makefile</code>:</p>
+<div class="sourceCode" id="cb12"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb12-1" title="1">abort <span class="st">&quot;Rust compiler required (https://www.rust-lang.org/)&quot;</span> <span class="kw">if</span> <span class="st">`which rustc`</span>.empty?</a>
+<a class="sourceLine" id="cb12-2" title="2"></a>
+<a class="sourceLine" id="cb12-3" title="3"><span class="dt">File</span>.open(<span class="st">&quot;Makefile&quot;</span>, <span class="st">&quot;wb&quot;</span>) <span class="kw">do</span> |f|</a>
+<a class="sourceLine" id="cb12-4" title="4"></a>
+<a class="sourceLine" id="cb12-5" title="5">  f.puts(&lt;&lt;<span class="kw">EOD</span><span class="ot">)</span></a>
+<a class="sourceLine" id="cb12-6" title="6"><span class="ot">all:</span></a>
+<a class="sourceLine" id="cb12-7" title="7"><span class="ot">\tbundle --deployment --path vendor/bundle</span></a>
+<a class="sourceLine" id="cb12-8" title="8"><span class="ot">\tbundle exec rake</span></a>
+<a class="sourceLine" id="cb12-9" title="9"><span class="ot">clean:</span></a>
+<a class="sourceLine" id="cb12-10" title="10"><span class="ot">install:</span></a>
+<a class="sourceLine" id="cb12-11" title="11"><span class="ot">\trm -r vendor/bundle target</span></a>
+<a class="sourceLine" id="cb12-12" title="12"><span class="kw">EOD</span></a>
+<a class="sourceLine" id="cb12-13" title="13"></a>
+<a class="sourceLine" id="cb12-14" title="14"><span class="kw">end</span></a></code></pre></div>
+<p>Since <code>gem</code> packager is using <code>git</code> to retrieve file list as a bare minimum we need to add files to the git cache:</p>
+<div class="sourceCode" id="cb13"><pre class="sourceCode bash"><code class="sourceCode bash"><a class="sourceLine" id="cb13-1" title="1">$ <span class="fu">git</span> add .</a></code></pre></div>
+<p>Finaly we can package our gem:</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode bash"><code class="sourceCode bash"><a class="sourceLine" id="cb14-1" title="1">$ <span class="ex">gem</span> build helix_csv</a></code></pre></div>
+<p>Done! We can now publish the gem, or simply create new directory, add <code>helix_csv-0.1.0.gem</code> to <code>vendor/cache</code>, add something like this to <code>Gemfile</code>:</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb15-1" title="1">source <span class="st">&quot;https://rubygems.org&quot;</span></a>
+<a class="sourceLine" id="cb15-2" title="2"></a>
+<a class="sourceLine" id="cb15-3" title="3">gem <span class="st">'helix_csv'</span></a></code></pre></div>
+<p>then run:</p>
+<div class="sourceCode" id="cb16"><pre class="sourceCode bash"><code class="sourceCode bash"><a class="sourceLine" id="cb16-1" title="1">$ <span class="ex">bundle</span> install --path=vendor/bundle</a>
+<a class="sourceLine" id="cb16-2" title="2"><span class="ex">Fetching</span> gem metadata from https://rubygems.org/.</a>
+<a class="sourceLine" id="cb16-3" title="3"><span class="ex">Fetching</span> gem metadata from https://rubygems.org/.</a>
+<a class="sourceLine" id="cb16-4" title="4"><span class="ex">Resolving</span> dependencies...</a>
+<a class="sourceLine" id="cb16-5" title="5"><span class="ex">Using</span> rake 12.3.1</a>
+<a class="sourceLine" id="cb16-6" title="6"><span class="ex">Using</span> bundler 1.17.1</a>
+<a class="sourceLine" id="cb16-7" title="7"><span class="ex">Using</span> thor 0.20.3</a>
+<a class="sourceLine" id="cb16-8" title="8"><span class="ex">Using</span> tomlrb 1.2.7</a>
+<a class="sourceLine" id="cb16-9" title="9"><span class="ex">Using</span> helix_runtime 0.7.5</a>
+<a class="sourceLine" id="cb16-10" title="10"><span class="ex">Installing</span> helix_csv 0.1.0</a>
+<a class="sourceLine" id="cb16-11" title="11"><span class="ex">Updating</span> files in vendor/cache</a>
+<a class="sourceLine" id="cb16-12" title="12">  <span class="ex">*</span> rake-12.3.1.gem</a>
+<a class="sourceLine" id="cb16-13" title="13">  <span class="ex">*</span> thor-0.20.3.gem</a>
+<a class="sourceLine" id="cb16-14" title="14">  <span class="ex">*</span> tomlrb-1.2.7.gem</a>
+<a class="sourceLine" id="cb16-15" title="15">  <span class="ex">*</span> helix_runtime-0.7.5.gem</a>
+<a class="sourceLine" id="cb16-16" title="16"><span class="ex">Bundle</span> complete! 1 Gemfile dependency, 6 gems now installed.</a>
+<a class="sourceLine" id="cb16-17" title="17"><span class="ex">Use</span> <span class="kw">`</span><span class="ex">bundle</span> info [gemname]<span class="kw">`</span> to see where a bundled gem is installed.</a>
+<a class="sourceLine" id="cb16-18" title="18"></a>
+<a class="sourceLine" id="cb16-19" title="19">$ <span class="ex">bundle</span> exec irb</a>
+<a class="sourceLine" id="cb16-20" title="20"><span class="ex">2.5.3</span> :001 <span class="op">&gt;</span> require <span class="st">'helix_csv'</span></a>
+<a class="sourceLine" id="cb16-21" title="21"> =<span class="op">&gt;</span> <span class="fu">true</span> </a>
+<a class="sourceLine" id="cb16-22" title="22"><span class="ex">2.5.3</span> :002 <span class="op">&gt;</span> helix_csv = HelixCSV.new(1)</a>
+<a class="sourceLine" id="cb16-23" title="23"> =<span class="op">&gt;</span> <span class="co">#&lt;HelixCSV:0x00005587b6c562a8&gt; </span></a>
+<a class="sourceLine" id="cb16-24" title="24"><span class="ex">2.5.3</span> :003 <span class="op">&gt;</span> helix_csv.n</a>
+<a class="sourceLine" id="cb16-25" title="25"> =<span class="op">&gt;</span> <span class="ex">1</span> </a>
+<a class="sourceLine" id="cb16-26" title="26"><span class="ex">2.5.3</span> :004 <span class="op">&gt;</span> helix_csv.add(4)</a>
+<a class="sourceLine" id="cb16-27" title="27"> =<span class="op">&gt;</span> <span class="ex">5</span> </a>
+<a class="sourceLine" id="cb16-28" title="28"><span class="ex">2.5.3</span> :005 <span class="op">&gt;</span> helix_csv.n</a>
+<a class="sourceLine" id="cb16-29" title="29"> =<span class="op">&gt;</span> <span class="ex">5</span> </a></code></pre></div>
+<p>In the next part I’m going to implement CSV parser based on <a href="https://docs.rs/csv/1.0.2/csv/">Rust CSV crate</a> and do some benchmarks.</p>
+
+        </div>
+
+        
+            <div id="disqus_thread"></div>
+            <script type="text/javascript">
+                var disqus_shortname = 'blog-vmoroz-com';
+                var disqus_identifier = '45ec0b48-32e2-4449-9e49-213f407d4589';
+                
+                (function() {
+                    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+                    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+                    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+                })();
+            </script>
+            <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+        
+
+        <div id="footer">
+            Generated by
+            <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+    </body>
+</html>
