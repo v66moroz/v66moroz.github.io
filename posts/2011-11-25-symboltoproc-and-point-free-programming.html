@@ -42,223 +42,223 @@
 </div>
 
 <p>Let’s say we have this schema:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">class</span> <span class="dt">Order</span> &lt; <span class="dt">ActiveRecord</span>::<span class="dt">Base</span>
-  has_many <span class="st">:order_items</span>
-<span class="kw">end</span>
- 
-<span class="kw">class</span> <span class="dt">OrderItem</span> &lt; <span class="dt">ActiveRecord</span>::<span class="dt">Base</span>
-  belongs_to <span class="st">:item</span>
-<span class="kw">end</span>
- 
-<span class="kw">class</span> <span class="dt">Item</span> &lt; <span class="dt">ActiveRecord</span>::<span class="dt">Base</span>
-  belongs_to <span class="st">:item_group</span>
-<span class="kw">end</span>
- 
-<span class="kw">class</span> <span class="dt">ItemGroup</span> &lt; <span class="dt">ActiveRecord</span>::<span class="dt">Base</span>
-<span class="kw">end</span></code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb1-1" title="1"><span class="kw">class</span> <span class="dt">Order</span> &lt; <span class="dt">ActiveRecord</span>::<span class="dt">Base</span></a>
+<a class="sourceLine" id="cb1-2" title="2">  has_many <span class="st">:order_items</span></a>
+<a class="sourceLine" id="cb1-3" title="3"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb1-4" title="4"> </a>
+<a class="sourceLine" id="cb1-5" title="5"><span class="kw">class</span> <span class="dt">OrderItem</span> &lt; <span class="dt">ActiveRecord</span>::<span class="dt">Base</span></a>
+<a class="sourceLine" id="cb1-6" title="6">  belongs_to <span class="st">:item</span></a>
+<a class="sourceLine" id="cb1-7" title="7"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb1-8" title="8"> </a>
+<a class="sourceLine" id="cb1-9" title="9"><span class="kw">class</span> <span class="dt">Item</span> &lt; <span class="dt">ActiveRecord</span>::<span class="dt">Base</span></a>
+<a class="sourceLine" id="cb1-10" title="10">  belongs_to <span class="st">:item_group</span></a>
+<a class="sourceLine" id="cb1-11" title="11"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb1-12" title="12"> </a>
+<a class="sourceLine" id="cb1-13" title="13"><span class="kw">class</span> <span class="dt">ItemGroup</span> &lt; <span class="dt">ActiveRecord</span>::<span class="dt">Base</span></a>
+<a class="sourceLine" id="cb1-14" title="14"><span class="kw">end</span></a></code></pre></div>
 <p>And what I want to do is to find all item groups for certain orders. Straightforward approach:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="dt">Order</span>.find(...).map { |order| 
-  order.order_items.map { |order_item| 
-    order_item.item.item_group 
-  } 
-}.flatten.uniq</code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb2-1" title="1"><span class="dt">Order</span>.find(...).map { |order| </a>
+<a class="sourceLine" id="cb2-2" title="2">  order.order_items.map { |order_item| </a>
+<a class="sourceLine" id="cb2-3" title="3">    order_item.item.item_group </a>
+<a class="sourceLine" id="cb2-4" title="4">  } </a>
+<a class="sourceLine" id="cb2-5" title="5">}.flatten.uniq</a></code></pre></div>
 <p>Let’s start from the inner part:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby">order_items.map { |order_item| order_item.item.item_group }</code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb3-1" title="1">order_items.map { |order_item| order_item.item.item_group }</a></code></pre></div>
 <p>If I wanted to find items, then it would be much shorter:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby">order_items.map(&amp;<span class="st">:item</span>)</code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb4-1" title="1">order_items.map(&amp;<span class="st">:item</span>)</a></code></pre></div>
 <p>Could it be easier if I were able to write</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby">order_items.map(&amp;[<span class="st">:item</span>, <span class="st">:item_group</span>])</code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb5-1" title="1">order_items.map(&amp;[<span class="st">:item</span>, <span class="st">:item_group</span>])</a></code></pre></div>
 <p>Certainly it could and all I need to do is to define Array#to_proc:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">class</span> <span class="dt">Array</span>
-  <span class="kw">def</span> to_proc
-    raise <span class="dt">ArgumentError</span>.new(<span class="st">&quot;empty collection&quot;</span>) <span class="kw">if</span> empty?
-    psh, *pst = map(&amp;<span class="st">:to_proc</span>)
-    lambda <span class="kw">do</span> |*args| 
-      pst.inject(psh[*args]) { |v, p| p[v] }
-    <span class="kw">end</span>
-  <span class="kw">end</span>
-<span class="kw">end</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb6-1" title="1"><span class="kw">class</span> <span class="dt">Array</span></a>
+<a class="sourceLine" id="cb6-2" title="2">  <span class="kw">def</span> to_proc</a>
+<a class="sourceLine" id="cb6-3" title="3">    raise <span class="dt">ArgumentError</span>.new(<span class="st">&quot;empty collection&quot;</span>) <span class="kw">if</span> empty?</a>
+<a class="sourceLine" id="cb6-4" title="4">    psh, *pst = map(&amp;<span class="st">:to_proc</span>)</a>
+<a class="sourceLine" id="cb6-5" title="5">    lambda <span class="kw">do</span> |*args| </a>
+<a class="sourceLine" id="cb6-6" title="6">      pst.inject(psh[*args]) { |v, p| p[v] }</a>
+<a class="sourceLine" id="cb6-7" title="7">    <span class="kw">end</span></a>
+<a class="sourceLine" id="cb6-8" title="8">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb6-9" title="9"><span class="kw">end</span></a></code></pre></div>
 <p>so my original statement can be rewritten as</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="dt">Order</span>.find(...).map{ |order| order.order_items
-                                  .map(&amp;[<span class="st">:item</span>, <span class="st">:item_group</span>]) }
-               .flatten.uniq</code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb7-1" title="1"><span class="dt">Order</span>.find(...).map{ |order| order.order_items</a>
+<a class="sourceLine" id="cb7-2" title="2">                                  .map(&amp;[<span class="st">:item</span>, <span class="st">:item_group</span>]) }</a>
+<a class="sourceLine" id="cb7-3" title="3">               .flatten.uniq</a></code></pre></div>
 <p>What about the outer part? To find all items I could use</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="dt">Order</span>.find(...).map(&amp;[<span class="st">:order_items</span>, <span class="st">:map?</span>])</code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb8-1" title="1"><span class="dt">Order</span>.find(...).map(&amp;[<span class="st">:order_items</span>, <span class="st">:map?</span>])</a></code></pre></div>
 <p>But how am I going to pass a block? There are two steps involved. First, I want to convert symbol to a lambda, which calls block behind the scene, and I also want my <code>Array#to_proc</code> to take <code>Proc</code> objects. Second step is trivial:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">class</span> <span class="dt">Array</span>
-  <span class="kw">def</span> to_proc
-    raise <span class="dt">ArgumentError</span>.new(<span class="st">&quot;empty collection&quot;</span>) <span class="kw">if</span> empty?
-    ps = 
-      map <span class="kw">do</span> |e|
-        <span class="kw">case</span> e 
-        <span class="kw">when</span> <span class="dt">Symbol</span>
-          e.to_proc
-        <span class="kw">when</span> <span class="dt">Proc</span>
-          e
-        <span class="kw">end</span>
-      <span class="kw">end</span>
-    psh, *pst = ps
-    lambda <span class="kw">do</span> |*args| 
-      pst.inject(psh[*args]) { |v, p| p[v] }
-    <span class="kw">end</span>
-  <span class="kw">end</span>
-<span class="kw">end</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb9-1" title="1"><span class="kw">class</span> <span class="dt">Array</span></a>
+<a class="sourceLine" id="cb9-2" title="2">  <span class="kw">def</span> to_proc</a>
+<a class="sourceLine" id="cb9-3" title="3">    raise <span class="dt">ArgumentError</span>.new(<span class="st">&quot;empty collection&quot;</span>) <span class="kw">if</span> empty?</a>
+<a class="sourceLine" id="cb9-4" title="4">    ps = </a>
+<a class="sourceLine" id="cb9-5" title="5">      map <span class="kw">do</span> |e|</a>
+<a class="sourceLine" id="cb9-6" title="6">        <span class="kw">case</span> e </a>
+<a class="sourceLine" id="cb9-7" title="7">        <span class="kw">when</span> <span class="dt">Symbol</span></a>
+<a class="sourceLine" id="cb9-8" title="8">          e.to_proc</a>
+<a class="sourceLine" id="cb9-9" title="9">        <span class="kw">when</span> <span class="dt">Proc</span></a>
+<a class="sourceLine" id="cb9-10" title="10">          e</a>
+<a class="sourceLine" id="cb9-11" title="11">        <span class="kw">end</span></a>
+<a class="sourceLine" id="cb9-12" title="12">      <span class="kw">end</span></a>
+<a class="sourceLine" id="cb9-13" title="13">    psh, *pst = ps</a>
+<a class="sourceLine" id="cb9-14" title="14">    lambda <span class="kw">do</span> |*args| </a>
+<a class="sourceLine" id="cb9-15" title="15">      pst.inject(psh[*args]) { |v, p| p[v] }</a>
+<a class="sourceLine" id="cb9-16" title="16">    <span class="kw">end</span></a>
+<a class="sourceLine" id="cb9-17" title="17">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb9-18" title="18"><span class="kw">end</span></a></code></pre></div>
 <p>And now I want to define <code>Symbol#with_args</code> which is going to call a method with arguments and a block:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">class</span> <span class="dt">Symbol</span>
-  <span class="kw">def</span> with_args(*args, &amp;block)
-    p = lambda { |e| e.__send__(<span class="dv">self</span>, *args, &amp;block) }
-    lambda { |e| p[e] }
-  <span class="kw">end</span>
-<span class="kw">end</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb10-1" title="1"><span class="kw">class</span> <span class="dt">Symbol</span></a>
+<a class="sourceLine" id="cb10-2" title="2">  <span class="kw">def</span> with_args(*args, &amp;block)</a>
+<a class="sourceLine" id="cb10-3" title="3">    p = lambda { |e| e.__send__(<span class="dv">self</span>, *args, &amp;block) }</a>
+<a class="sourceLine" id="cb10-4" title="4">    lambda { |e| p[e] }</a>
+<a class="sourceLine" id="cb10-5" title="5">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb10-6" title="6"><span class="kw">end</span></a></code></pre></div>
 <p>So original statement becomes even shorter</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="dt">Order</span>.find(...).map(&amp;[<span class="st">:order_items</span>, 
-                      <span class="st">:map</span>.with_args(&amp;[<span class="st">:item</span>, <span class="st">:item_group</span>])
-               .flatten.uniq</code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb11-1" title="1"><span class="dt">Order</span>.find(...).map(&amp;[<span class="st">:order_items</span>, </a>
+<a class="sourceLine" id="cb11-2" title="2">                      <span class="st">:map</span>.with_args(&amp;[<span class="st">:item</span>, <span class="st">:item_group</span>])</a>
+<a class="sourceLine" id="cb11-3" title="3">               .flatten.uniq</a></code></pre></div>
 <p>So I finally removed all “points”, i. e. any mentionigs of block arguments.</p>
 <p>Why this is important and what have I actually saved here? Well, Ruby has what I can call “loose” scoping, block arguments don’t shadow outer scope, neither Ruby produce any warning about that. In deeply nested statements naming can become a serious issue. Of course, I could create small method for every step with it’s own scope, but it doesn’t help readability at all.</p>
 <p>Now, Ruby has a nice deconstruction of block arguments</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby">[[<span class="dv">1</span>,[<span class="dv">2</span>,<span class="dv">3</span>]], [<span class="dv">4</span>,[<span class="dv">5</span>,<span class="dv">6</span>]]].map { |x, (y, z)| z } <span class="co"># =&gt; [3,6]</span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb12-1" title="1">[[<span class="dv">1</span>,[<span class="dv">2</span>,<span class="dv">3</span>]], [<span class="dv">4</span>,[<span class="dv">5</span>,<span class="dv">6</span>]]].map { |x, (y, z)| z } <span class="co"># =&gt; [3,6]</span></a></code></pre></div>
 <p>and I want to prepare data for my view, and in fact I don’t need whole item group model, I just need to keep name and id so I can write in my view</p>
 <pre class="haml"><code>%ul
   - item_groups.each do |id, name|
     %li= link_to name, item_group_path(id)</code></pre>
 <p>my controller code then becomes</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby">item_groups = 
-  <span class="dt">Order</span>.....map{ |item_group| [item_group.id, item_group.name] }</code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb14-1" title="1">item_groups = </a>
+<a class="sourceLine" id="cb14-2" title="2">  <span class="dt">Order</span>.....map{ |item_group| [item_group.id, item_group.name] }</a></code></pre></div>
 <p>Now we have the same “point” again, we have to name item_group to convert it to a pair. If we could only write</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby">...map(&amp;[<span class="st">:id</span>, <span class="st">:name</span>])</code></pre></div>
+<div class="sourceCode" id="cb15"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb15-1" title="1">...map(&amp;[<span class="st">:id</span>, <span class="st">:name</span>])</a></code></pre></div>
 <p>but this place is already taken. Well, is it? What if I pass nested array and will change “direction” with each level (I will name previous case as “vertical”, and this new way as “horizontal”):</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">class</span> <span class="dt">Array</span>
-  <span class="kw">def</span> to_proc(horizontal = <span class="dv">nil</span>)
-    raise <span class="dt">ArgumentError</span>.new(<span class="st">&quot;empty collection&quot;</span>) <span class="kw">if</span> empty?
-    ps = 
-      map <span class="kw">do</span> |e|
-        <span class="kw">case</span> e 
-        <span class="kw">when</span> <span class="dt">Array</span>
-          e.to_proc(!horizontal)
-        <span class="kw">when</span> <span class="dt">Symbol</span>
-          e.to_proc
-        <span class="kw">when</span> <span class="dt">Proc</span>
-          e
-        <span class="kw">end</span>
-      <span class="kw">end</span>
-    <span class="kw">if</span> horizontal
-      lambda { |*args| ps.map { |p| p[*args] } }
-    <span class="kw">else</span>
-      psh, *pst = ps
-      lambda <span class="kw">do</span> |*args| 
-        pst.inject(psh[*args]) { |v, p| p[v] }
-      <span class="kw">end</span>
-    <span class="kw">end</span>
-  <span class="kw">end</span>
-<span class="kw">end</span></code></pre></div>
+<div class="sourceCode" id="cb16"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb16-1" title="1"><span class="kw">class</span> <span class="dt">Array</span></a>
+<a class="sourceLine" id="cb16-2" title="2">  <span class="kw">def</span> to_proc(horizontal = <span class="dv">nil</span>)</a>
+<a class="sourceLine" id="cb16-3" title="3">    raise <span class="dt">ArgumentError</span>.new(<span class="st">&quot;empty collection&quot;</span>) <span class="kw">if</span> empty?</a>
+<a class="sourceLine" id="cb16-4" title="4">    ps = </a>
+<a class="sourceLine" id="cb16-5" title="5">      map <span class="kw">do</span> |e|</a>
+<a class="sourceLine" id="cb16-6" title="6">        <span class="kw">case</span> e </a>
+<a class="sourceLine" id="cb16-7" title="7">        <span class="kw">when</span> <span class="dt">Array</span></a>
+<a class="sourceLine" id="cb16-8" title="8">          e.to_proc(!horizontal)</a>
+<a class="sourceLine" id="cb16-9" title="9">        <span class="kw">when</span> <span class="dt">Symbol</span></a>
+<a class="sourceLine" id="cb16-10" title="10">          e.to_proc</a>
+<a class="sourceLine" id="cb16-11" title="11">        <span class="kw">when</span> <span class="dt">Proc</span></a>
+<a class="sourceLine" id="cb16-12" title="12">          e</a>
+<a class="sourceLine" id="cb16-13" title="13">        <span class="kw">end</span></a>
+<a class="sourceLine" id="cb16-14" title="14">      <span class="kw">end</span></a>
+<a class="sourceLine" id="cb16-15" title="15">    <span class="kw">if</span> horizontal</a>
+<a class="sourceLine" id="cb16-16" title="16">      lambda { |*args| ps.map { |p| p[*args] } }</a>
+<a class="sourceLine" id="cb16-17" title="17">    <span class="kw">else</span></a>
+<a class="sourceLine" id="cb16-18" title="18">      psh, *pst = ps</a>
+<a class="sourceLine" id="cb16-19" title="19">      lambda <span class="kw">do</span> |*args| </a>
+<a class="sourceLine" id="cb16-20" title="20">        pst.inject(psh[*args]) { |v, p| p[v] }</a>
+<a class="sourceLine" id="cb16-21" title="21">      <span class="kw">end</span></a>
+<a class="sourceLine" id="cb16-22" title="22">    <span class="kw">end</span></a>
+<a class="sourceLine" id="cb16-23" title="23">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb16-24" title="24"><span class="kw">end</span></a></code></pre></div>
 <p>Now we can write</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby">...map(&amp;[[<span class="st">:id</span>, <span class="st">:name</span>]])</code></pre></div>
+<div class="sourceCode" id="cb17"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb17-1" title="1">...map(&amp;[[<span class="st">:id</span>, <span class="st">:name</span>]])</a></code></pre></div>
 <p>Wait a second, now the whole statement can be written differently</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="dt">Order</span>.find(...).map(&amp;[<span class="st">:order_items</span>, 
-                      <span class="st">:map</span>.with_args(&amp;[<span class="st">:item</span>, 
-                                       <span class="st">:item_group</span>, 
-                                       [<span class="st">:id</span>, <span class="st">:name</span>]])])
-               .flatten(<span class="dv">1</span>).uniq</code></pre></div>
+<div class="sourceCode" id="cb18"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb18-1" title="1"><span class="dt">Order</span>.find(...).map(&amp;[<span class="st">:order_items</span>, </a>
+<a class="sourceLine" id="cb18-2" title="2">                      <span class="st">:map</span>.with_args(&amp;[<span class="st">:item</span>, </a>
+<a class="sourceLine" id="cb18-3" title="3">                                       <span class="st">:item_group</span>, </a>
+<a class="sourceLine" id="cb18-4" title="4">                                       [<span class="st">:id</span>, <span class="st">:name</span>]])])</a>
+<a class="sourceLine" id="cb18-5" title="5">               .flatten(<span class="dv">1</span>).uniq</a></code></pre></div>
 <p>Meanwhile just remembering good old <code>Symbol#to_proc</code> I can rewrite it as</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="dt">Order</span>.find(...)
-  .map(&amp;[<span class="st">:order_items</span>, 
-         <span class="st">:map</span>.with_args(&amp;[<span class="st">:item</span>, <span class="st">:item_group</span>, [<span class="st">:id</span>, <span class="st">:name</span>]])])
-  .inject([], &amp;:&lt;&lt;).uniq</code></pre></div>
+<div class="sourceCode" id="cb19"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb19-1" title="1"><span class="dt">Order</span>.find(...)</a>
+<a class="sourceLine" id="cb19-2" title="2">  .map(&amp;[<span class="st">:order_items</span>, </a>
+<a class="sourceLine" id="cb19-3" title="3">         <span class="st">:map</span>.with_args(&amp;[<span class="st">:item</span>, <span class="st">:item_group</span>, [<span class="st">:id</span>, <span class="st">:name</span>]])])</a>
+<a class="sourceLine" id="cb19-4" title="4">  .inject([], &amp;:&lt;&lt;).uniq</a></code></pre></div>
 <p>or even</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="dt">Order</span>.find(...)
-  .map(&amp;[<span class="st">:order_items</span>, 
-         <span class="st">:map</span>.with_args(&amp;[<span class="st">:item</span>, <span class="st">:item_group</span>, [<span class="st">:id</span>, <span class="st">:name</span>]])])
-  .inject(<span class="dt">Set</span>.new, &amp;:+).to_a</code></pre></div>
+<div class="sourceCode" id="cb20"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb20-1" title="1"><span class="dt">Order</span>.find(...)</a>
+<a class="sourceLine" id="cb20-2" title="2">  .map(&amp;[<span class="st">:order_items</span>, </a>
+<a class="sourceLine" id="cb20-3" title="3">         <span class="st">:map</span>.with_args(&amp;[<span class="st">:item</span>, <span class="st">:item_group</span>, [<span class="st">:id</span>, <span class="st">:name</span>]])])</a>
+<a class="sourceLine" id="cb20-4" title="4">  .inject(<span class="dt">Set</span>.new, &amp;:+).to_a</a></code></pre></div>
 <p>which brings us to another point – can we actually join map and inject into one inject? There is a small problem here. Imagine we want to find sum of squares</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby">[<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>].inject(<span class="dv">0</span>) { |a, x| a + x ** <span class="dv">2</span> }</code></pre></div>
+<div class="sourceCode" id="cb21"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb21-1" title="1">[<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>].inject(<span class="dv">0</span>) { |a, x| a + x ** <span class="dv">2</span> }</a></code></pre></div>
 <p>can we write it in point-free style? Something like</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby">[<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>].inject(<span class="dv">0</span>, &amp;[:**.with_args(<span class="dv">2</span>), :+])</code></pre></div>
+<div class="sourceCode" id="cb22"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb22-1" title="1">[<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>].inject(<span class="dv">0</span>, &amp;[:**.with_args(<span class="dv">2</span>), :+])</a></code></pre></div>
 <p>This obviously won’t work as inject passes <code>a</code> and <code>x</code>, so what is actually getting to <code>**</code> is <code>a</code>, not <code>x</code>, and then the result of <code>**</code> is a number, not an array needed for sum. We need to somehow “slice” arguments and apply <code>**</code> to a second one, but return both of them, and then “splat” an array and call block with more than one argument</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby">[<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>].inject(<span class="dv">0</span>, &amp;[slice_args(<span class="dv">1</span>, &amp;:**.with_args(<span class="dv">2</span>)), 
-                    <span class="st">:splat</span>.with_args(&amp;:+)])</code></pre></div>
+<div class="sourceCode" id="cb23"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb23-1" title="1">[<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>].inject(<span class="dv">0</span>, &amp;[slice_args(<span class="dv">1</span>, &amp;:**.with_args(<span class="dv">2</span>)), </a>
+<a class="sourceLine" id="cb23-2" title="2">                    <span class="st">:splat</span>.with_args(&amp;:+)])</a></code></pre></div>
 <p>We need to add two more methods:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">def</span> slice_args(index = <span class="dv">0</span>, &amp;block)
-  lambda <span class="kw">do</span> |*args|
-    args[index] = block[args[index]]
-    args
-  <span class="kw">end</span>
-<span class="kw">end</span>
- 
-<span class="kw">class</span> <span class="dt">Array</span>
-  <span class="kw">def</span> splat(&amp;block)
-    block[*<span class="dv">self</span>]
-  <span class="kw">end</span>
-<span class="kw">end</span></code></pre></div>
+<div class="sourceCode" id="cb24"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb24-1" title="1"><span class="kw">def</span> slice_args(index = <span class="dv">0</span>, &amp;block)</a>
+<a class="sourceLine" id="cb24-2" title="2">  lambda <span class="kw">do</span> |*args|</a>
+<a class="sourceLine" id="cb24-3" title="3">    args[index] = block[args[index]]</a>
+<a class="sourceLine" id="cb24-4" title="4">    args</a>
+<a class="sourceLine" id="cb24-5" title="5">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb24-6" title="6"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb24-7" title="7"> </a>
+<a class="sourceLine" id="cb24-8" title="8"><span class="kw">class</span> <span class="dt">Array</span></a>
+<a class="sourceLine" id="cb24-9" title="9">  <span class="kw">def</span> splat(&amp;block)</a>
+<a class="sourceLine" id="cb24-10" title="10">    block[*<span class="dv">self</span>]</a>
+<a class="sourceLine" id="cb24-11" title="11">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb24-12" title="12"><span class="kw">end</span></a></code></pre></div>
 <p>So original example can be rewritten as</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="dt">Order</span>.find(...)
-  .inject(<span class="dt">Set</span>.new, 
-          &amp;[slice_args(<span class="dv">1</span>, &amp;[<span class="st">:order_items</span>, 
-                            <span class="st">:map</span>.with_args(&amp;[<span class="st">:item</span>, 
-                                             <span class="st">:item_group</span>, 
-                                             [<span class="st">:id</span>, <span class="st">:name</span>]])]), 
-            <span class="st">:splat</span>.with_args(&amp;:+)]).to_a</code></pre></div>
+<div class="sourceCode" id="cb25"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb25-1" title="1"><span class="dt">Order</span>.find(...)</a>
+<a class="sourceLine" id="cb25-2" title="2">  .inject(<span class="dt">Set</span>.new, </a>
+<a class="sourceLine" id="cb25-3" title="3">          &amp;[slice_args(<span class="dv">1</span>, &amp;[<span class="st">:order_items</span>, </a>
+<a class="sourceLine" id="cb25-4" title="4">                            <span class="st">:map</span>.with_args(&amp;[<span class="st">:item</span>, </a>
+<a class="sourceLine" id="cb25-5" title="5">                                             <span class="st">:item_group</span>, </a>
+<a class="sourceLine" id="cb25-6" title="6">                                             [<span class="st">:id</span>, <span class="st">:name</span>]])]), </a>
+<a class="sourceLine" id="cb25-7" title="7">            <span class="st">:splat</span>.with_args(&amp;:+)]).to_a</a></code></pre></div>
 <p>There is a pattern here. I take an object and apply some transformation (e.g. an array) to it and get similar structure as a result. What if I use hash instead of an array? Obviously I should get hash back. To make this happen I define <code>Hash#to_proc</code>:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">class</span> <span class="dt">Hash</span>
-  <span class="kw">def</span> kv_map(&amp;block)
-    block ||= k_lambda
-    inject(<span class="dv">self</span>.class.new) <span class="kw">do</span> |kv, (k, v)|
-      kv[k] = block[v]
-      kv
-    <span class="kw">end</span>
-  <span class="kw">end</span>
- 
-  <span class="kw">def</span> to_proc
-    ps = 
-      kv_map <span class="kw">do</span> |e|
-        <span class="kw">case</span> e
-        <span class="kw">when</span> <span class="dt">Array</span>, <span class="dt">Hash</span>
-          e.to_proc
-        <span class="kw">when</span> <span class="dt">Symbol</span>
-          e.to_proc
-        <span class="kw">when</span> <span class="dt">Proc</span>
-          e
-        <span class="kw">else</span>
-          lambda { e }
-        <span class="kw">end</span>
-      <span class="kw">end</span>
-    lambda { |*args| ps.kv_map{ |p| p[*args] } }
-  <span class="kw">end</span>
-<span class="kw">end</span>
- 
-<span class="kw">class</span> <span class="dt">Array</span>
-  <span class="kw">def</span> to_proc(horizontal = <span class="dv">nil</span>)
-    raise <span class="dt">ArgumentError</span>.new(<span class="st">&quot;empty collection&quot;</span>) <span class="kw">if</span> empty?
-    ps = 
-      map <span class="kw">do</span> |e|
-        <span class="kw">case</span> e 
-        <span class="kw">when</span> <span class="dt">Array</span>
-          e.to_proc(!horizontal)
-        <span class="kw">when</span> <span class="dt">Hash</span>
-          e.to_proc
-        <span class="kw">when</span> <span class="dt">Symbol</span>
-          e.to_proc
-        <span class="kw">when</span> <span class="dt">Proc</span>
-          e
-        <span class="kw">else</span>
-          lambda { e }
-        <span class="kw">end</span>
-      <span class="kw">end</span>
-    <span class="kw">if</span> horizontal
-      lambda { |*args| ps.map { |p| p[*args] } }
-    <span class="kw">else</span>
-      psh, *pst = ps
-      lambda <span class="kw">do</span> |*args| 
-        pst.inject(psh[*args]) { |v, p| p[v] }
-      <span class="kw">end</span>
-    <span class="kw">end</span>
-  <span class="kw">end</span>
-<span class="kw">end</span></code></pre></div>
+<div class="sourceCode" id="cb26"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb26-1" title="1"><span class="kw">class</span> <span class="dt">Hash</span></a>
+<a class="sourceLine" id="cb26-2" title="2">  <span class="kw">def</span> kv_map(&amp;block)</a>
+<a class="sourceLine" id="cb26-3" title="3">    block ||= k_lambda</a>
+<a class="sourceLine" id="cb26-4" title="4">    inject(<span class="dv">self</span>.class.new) <span class="kw">do</span> |kv, (k, v)|</a>
+<a class="sourceLine" id="cb26-5" title="5">      kv[k] = block[v]</a>
+<a class="sourceLine" id="cb26-6" title="6">      kv</a>
+<a class="sourceLine" id="cb26-7" title="7">    <span class="kw">end</span></a>
+<a class="sourceLine" id="cb26-8" title="8">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb26-9" title="9"> </a>
+<a class="sourceLine" id="cb26-10" title="10">  <span class="kw">def</span> to_proc</a>
+<a class="sourceLine" id="cb26-11" title="11">    ps = </a>
+<a class="sourceLine" id="cb26-12" title="12">      kv_map <span class="kw">do</span> |e|</a>
+<a class="sourceLine" id="cb26-13" title="13">        <span class="kw">case</span> e</a>
+<a class="sourceLine" id="cb26-14" title="14">        <span class="kw">when</span> <span class="dt">Array</span>, <span class="dt">Hash</span></a>
+<a class="sourceLine" id="cb26-15" title="15">          e.to_proc</a>
+<a class="sourceLine" id="cb26-16" title="16">        <span class="kw">when</span> <span class="dt">Symbol</span></a>
+<a class="sourceLine" id="cb26-17" title="17">          e.to_proc</a>
+<a class="sourceLine" id="cb26-18" title="18">        <span class="kw">when</span> <span class="dt">Proc</span></a>
+<a class="sourceLine" id="cb26-19" title="19">          e</a>
+<a class="sourceLine" id="cb26-20" title="20">        <span class="kw">else</span></a>
+<a class="sourceLine" id="cb26-21" title="21">          lambda { e }</a>
+<a class="sourceLine" id="cb26-22" title="22">        <span class="kw">end</span></a>
+<a class="sourceLine" id="cb26-23" title="23">      <span class="kw">end</span></a>
+<a class="sourceLine" id="cb26-24" title="24">    lambda { |*args| ps.kv_map{ |p| p[*args] } }</a>
+<a class="sourceLine" id="cb26-25" title="25">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb26-26" title="26"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb26-27" title="27"> </a>
+<a class="sourceLine" id="cb26-28" title="28"><span class="kw">class</span> <span class="dt">Array</span></a>
+<a class="sourceLine" id="cb26-29" title="29">  <span class="kw">def</span> to_proc(horizontal = <span class="dv">nil</span>)</a>
+<a class="sourceLine" id="cb26-30" title="30">    raise <span class="dt">ArgumentError</span>.new(<span class="st">&quot;empty collection&quot;</span>) <span class="kw">if</span> empty?</a>
+<a class="sourceLine" id="cb26-31" title="31">    ps = </a>
+<a class="sourceLine" id="cb26-32" title="32">      map <span class="kw">do</span> |e|</a>
+<a class="sourceLine" id="cb26-33" title="33">        <span class="kw">case</span> e </a>
+<a class="sourceLine" id="cb26-34" title="34">        <span class="kw">when</span> <span class="dt">Array</span></a>
+<a class="sourceLine" id="cb26-35" title="35">          e.to_proc(!horizontal)</a>
+<a class="sourceLine" id="cb26-36" title="36">        <span class="kw">when</span> <span class="dt">Hash</span></a>
+<a class="sourceLine" id="cb26-37" title="37">          e.to_proc</a>
+<a class="sourceLine" id="cb26-38" title="38">        <span class="kw">when</span> <span class="dt">Symbol</span></a>
+<a class="sourceLine" id="cb26-39" title="39">          e.to_proc</a>
+<a class="sourceLine" id="cb26-40" title="40">        <span class="kw">when</span> <span class="dt">Proc</span></a>
+<a class="sourceLine" id="cb26-41" title="41">          e</a>
+<a class="sourceLine" id="cb26-42" title="42">        <span class="kw">else</span></a>
+<a class="sourceLine" id="cb26-43" title="43">          lambda { e }</a>
+<a class="sourceLine" id="cb26-44" title="44">        <span class="kw">end</span></a>
+<a class="sourceLine" id="cb26-45" title="45">      <span class="kw">end</span></a>
+<a class="sourceLine" id="cb26-46" title="46">    <span class="kw">if</span> horizontal</a>
+<a class="sourceLine" id="cb26-47" title="47">      lambda { |*args| ps.map { |p| p[*args] } }</a>
+<a class="sourceLine" id="cb26-48" title="48">    <span class="kw">else</span></a>
+<a class="sourceLine" id="cb26-49" title="49">      psh, *pst = ps</a>
+<a class="sourceLine" id="cb26-50" title="50">      lambda <span class="kw">do</span> |*args| </a>
+<a class="sourceLine" id="cb26-51" title="51">        pst.inject(psh[*args]) { |v, p| p[v] }</a>
+<a class="sourceLine" id="cb26-52" title="52">      <span class="kw">end</span></a>
+<a class="sourceLine" id="cb26-53" title="53">    <span class="kw">end</span></a>
+<a class="sourceLine" id="cb26-54" title="54">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb26-55" title="55"><span class="kw">end</span></a></code></pre></div>
 <p>Now I can write things like</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="dt">K_LAMBDA</span> = lambda{ |x| x }
- 
-[<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>].map(&amp;{<span class="st">:i</span> =&gt; <span class="dt">K_LAMBDA</span>, <span class="st">:i_sq</span> =&gt; :**.with_args(<span class="dv">2</span>)}) 
-<span class="co">#=&gt; [{:i_sq=&gt;1, :i=&gt;1}, {:i_sq=&gt;4, :i=&gt;2}, {:i_sq=&gt;9, :i=&gt;3}]</span></code></pre></div>
+<div class="sourceCode" id="cb27"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb27-1" title="1"><span class="dt">K_LAMBDA</span> = lambda{ |x| x }</a>
+<a class="sourceLine" id="cb27-2" title="2"> </a>
+<a class="sourceLine" id="cb27-3" title="3">[<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>].map(&amp;{<span class="st">:i</span> =&gt; <span class="dt">K_LAMBDA</span>, <span class="st">:i_sq</span> =&gt; :**.with_args(<span class="dv">2</span>)}) </a>
+<a class="sourceLine" id="cb27-4" title="4"><span class="co">#=&gt; [{:i_sq=&gt;1, :i=&gt;1}, {:i_sq=&gt;4, :i=&gt;2}, {:i_sq=&gt;9, :i=&gt;3}]</span></a></code></pre></div>
 <p>All of this may seem a bit theoretical, but it does save some typing and make code more readable if used wisely.</p>
 
         </div>

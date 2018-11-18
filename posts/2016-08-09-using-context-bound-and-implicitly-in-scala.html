@@ -42,36 +42,36 @@
 </div>
 
 <p>Context bound is a syntactic sugar for implicit argument:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> f[A : B](a: A) = <span class="fu">g</span>(a) <span class="co">// where g requires an implicit value of type B[A]</span></code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode scala"><code class="sourceCode scala"><a class="sourceLine" id="cb1-1" title="1"><span class="kw">def</span> f[A : B](a: A) = <span class="fu">g</span>(a) <span class="co">// where g requires an implicit value of type B[A]</span></a></code></pre></div>
 <p>which is de-sugared to</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> f[A](a: A)(<span class="kw">implicit</span> ev: B[A]) = ...</code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode scala"><code class="sourceCode scala"><a class="sourceLine" id="cb2-1" title="1"><span class="kw">def</span> f[A](a: A)(<span class="kw">implicit</span> ev: B[A]) = ...</a></code></pre></div>
 <p>(<a href="http://docs.scala-lang.org/tutorials/FAQ/context-and-view-bounds.html">Scala Documentation</a>)</p>
 <p>So far so good, but on the same page there is <em>another very common example in the library</em>:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> f[A : Ordering](a: A, b: A) = implicitly[Ordering[A]].<span class="fu">compare</span>(a, b)</code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode scala"><code class="sourceCode scala"><a class="sourceLine" id="cb3-1" title="1"><span class="kw">def</span> f[A : Ordering](a: A, b: A) = implicitly[Ordering[A]].<span class="fu">compare</span>(a, b)</a></code></pre></div>
 <p>so one can imagine it’s a syntactic sugar for</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> f[A](a: A, b: A)(<span class="kw">implicit</span> ev: Ordering[A]) = ev.<span class="fu">compare</span>(a, b)</code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode scala"><code class="sourceCode scala"><a class="sourceLine" id="cb4-1" title="1"><span class="kw">def</span> f[A](a: A, b: A)(<span class="kw">implicit</span> ev: Ordering[A]) = ev.<span class="fu">compare</span>(a, b)</a></code></pre></div>
 <p>Let’s look closer at de-sugared versions:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="co">// Type bound with implicitly</span>
-<span class="kw">def</span> <span class="fu">f</span>(a: Object, b: Object, evidence$<span class="dv">2</span>: scala.<span class="fu">math</span>.<span class="fu">Ordering</span>): Int = 
-  scala.<span class="fu">Predef</span>.<span class="fu">implicitly</span>(evidence$<span class="dv">2</span>).$asInstanceOf[math.<span class="fu">Ordering</span>]().<span class="fu">compare</span>(a, b);
-
-<span class="co">// Implicit argument</span>
-<span class="kw">def</span> <span class="fu">f</span>(a: Object, b: Object, ev: scala.<span class="fu">math</span>.<span class="fu">Ordering</span>): Int = ev.<span class="fu">compare</span>(a, b);</code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode scala"><code class="sourceCode scala"><a class="sourceLine" id="cb5-1" title="1"><span class="co">// Type bound with implicitly</span></a>
+<a class="sourceLine" id="cb5-2" title="2"><span class="kw">def</span> <span class="fu">f</span>(a: Object, b: Object, evidence$<span class="dv">2</span>: scala.<span class="fu">math</span>.<span class="fu">Ordering</span>): Int = </a>
+<a class="sourceLine" id="cb5-3" title="3">  scala.<span class="fu">Predef</span>.<span class="fu">implicitly</span>(evidence$<span class="dv">2</span>).$asInstanceOf[math.<span class="fu">Ordering</span>]().<span class="fu">compare</span>(a, b);</a>
+<a class="sourceLine" id="cb5-4" title="4"></a>
+<a class="sourceLine" id="cb5-5" title="5"><span class="co">// Implicit argument</span></a>
+<a class="sourceLine" id="cb5-6" title="6"><span class="kw">def</span> <span class="fu">f</span>(a: Object, b: Object, ev: scala.<span class="fu">math</span>.<span class="fu">Ordering</span>): Int = ev.<span class="fu">compare</span>(a, b);</a></code></pre></div>
 <p>Well, I have to admit both versions are doing the same thing at the end, but if I’m writing a library method there is a difference. It’s even more obvious when looking at the bytecode:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"> <span class="dv">0</span>: getstatic     #<span class="dv">32</span>
- <span class="dv">3</span>: aload_3
- <span class="dv">4</span>: invokevirtual #<span class="dv">36</span>
- <span class="dv">7</span>: checkcast     #<span class="dv">14</span>
-<span class="dv">10</span>: aload_1
-<span class="dv">11</span>: aload_2
-<span class="dv">12</span>: invokeinterface #<span class="dv">40</span>,  <span class="dv">3</span>
-<span class="dv">17</span>: ireturn</code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode scala"><code class="sourceCode scala"><a class="sourceLine" id="cb6-1" title="1"> <span class="dv">0</span>: getstatic     #<span class="dv">32</span></a>
+<a class="sourceLine" id="cb6-2" title="2"> <span class="dv">3</span>: aload_<span class="dv">3</span></a>
+<a class="sourceLine" id="cb6-3" title="3"> <span class="dv">4</span>: invokevirtual #<span class="dv">36</span></a>
+<a class="sourceLine" id="cb6-4" title="4"> <span class="dv">7</span>: checkcast     #<span class="dv">14</span></a>
+<a class="sourceLine" id="cb6-5" title="5"><span class="dv">10</span>: aload_<span class="dv">1</span></a>
+<a class="sourceLine" id="cb6-6" title="6"><span class="dv">11</span>: aload_<span class="dv">2</span></a>
+<a class="sourceLine" id="cb6-7" title="7"><span class="dv">12</span>: invokeinterface #<span class="dv">40</span>,  <span class="dv">3</span></a>
+<a class="sourceLine" id="cb6-8" title="8"><span class="dv">17</span>: ireturn</a></code></pre></div>
 <p>vs</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="dv">0</span>: aload_3
-<span class="dv">1</span>: aload_1
-<span class="dv">2</span>: aload_2
-<span class="dv">3</span>: invokeinterface #<span class="dv">40</span>,  <span class="dv">3</span>
-<span class="dv">8</span>: ireturn</code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode scala"><code class="sourceCode scala"><a class="sourceLine" id="cb7-1" title="1"><span class="dv">0</span>: aload_<span class="dv">3</span></a>
+<a class="sourceLine" id="cb7-2" title="2"><span class="dv">1</span>: aload_<span class="dv">1</span></a>
+<a class="sourceLine" id="cb7-3" title="3"><span class="dv">2</span>: aload_<span class="dv">2</span></a>
+<a class="sourceLine" id="cb7-4" title="4"><span class="dv">3</span>: invokeinterface #<span class="dv">40</span>,  <span class="dv">3</span></a>
+<a class="sourceLine" id="cb7-5" title="5"><span class="dv">8</span>: ireturn</a></code></pre></div>
 <p>So whenever performance is an issue I would avoid using the pattern with <code>implicitly</code>.</p>
 
         </div>

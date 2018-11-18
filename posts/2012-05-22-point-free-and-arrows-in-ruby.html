@@ -42,84 +42,84 @@
 </div>
 
 <p>Extending point free functionality I came to a conclusion that using <code>Array</code> as a base for function fanout/composition was not really a good idea. From one side it’s concise and convenient, but using “direction” doesn’t look right, it can’t be easily extended to more complex cases, messing with <code>Array#to_proc</code> would better be avoided, and last but not least instantiating <code>Array</code> object and calling <code>to_proc</code> each time leads to a possible performance issue. Besides, there is a syntax which makes same thing almost as concise as an <code>Array</code>, and it’s <code>Proc#[]</code>, and <code>Proc</code> object doesn’t need to be converted when passing as a block. So let’s start with fanout/composition:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="dt">PComp</span> = 
-  lambda <span class="kw">do</span> |*xs|
-    <span class="kw">if</span> xs.empty?
-      <span class="dt">PId</span>
-    <span class="kw">else</span>
-      ph, *ps = xs.map(&amp;<span class="st">:to_proc</span>)
-      lambda <span class="kw">do</span> |*ys|
-        r = ph[*ys]
-        ps.each <span class="kw">do</span> |p|
-          r = p[r]
-        <span class="kw">end</span>
-        r
-      <span class="kw">end</span>
-    <span class="kw">end</span>
-  <span class="kw">end</span>
-   
-<span class="dt">PSplat</span> =
-  lambda <span class="kw">do</span> |*xs|
-    ps = xs.map(&amp;<span class="st">:to_proc</span>)
-    lambda { |*ys| ps.map { |p| p[*ys] } }
-  <span class="kw">end</span></code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb1-1" title="1"><span class="dt">PComp</span> = </a>
+<a class="sourceLine" id="cb1-2" title="2">  lambda <span class="kw">do</span> |*xs|</a>
+<a class="sourceLine" id="cb1-3" title="3">    <span class="kw">if</span> xs.empty?</a>
+<a class="sourceLine" id="cb1-4" title="4">      <span class="dt">PId</span></a>
+<a class="sourceLine" id="cb1-5" title="5">    <span class="kw">else</span></a>
+<a class="sourceLine" id="cb1-6" title="6">      ph, *ps = xs.map(&amp;<span class="st">:to_proc</span>)</a>
+<a class="sourceLine" id="cb1-7" title="7">      lambda <span class="kw">do</span> |*ys|</a>
+<a class="sourceLine" id="cb1-8" title="8">        r = ph[*ys]</a>
+<a class="sourceLine" id="cb1-9" title="9">        ps.each <span class="kw">do</span> |p|</a>
+<a class="sourceLine" id="cb1-10" title="10">          r = p[r]</a>
+<a class="sourceLine" id="cb1-11" title="11">        <span class="kw">end</span></a>
+<a class="sourceLine" id="cb1-12" title="12">        r</a>
+<a class="sourceLine" id="cb1-13" title="13">      <span class="kw">end</span></a>
+<a class="sourceLine" id="cb1-14" title="14">    <span class="kw">end</span></a>
+<a class="sourceLine" id="cb1-15" title="15">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb1-16" title="16">   </a>
+<a class="sourceLine" id="cb1-17" title="17"><span class="dt">PSplat</span> =</a>
+<a class="sourceLine" id="cb1-18" title="18">  lambda <span class="kw">do</span> |*xs|</a>
+<a class="sourceLine" id="cb1-19" title="19">    ps = xs.map(&amp;<span class="st">:to_proc</span>)</a>
+<a class="sourceLine" id="cb1-20" title="20">    lambda { |*ys| ps.map { |p| p[*ys] } }</a>
+<a class="sourceLine" id="cb1-21" title="21">  <span class="kw">end</span></a></code></pre></div>
 <p>So example in my previous post can be rewritten as:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="dt">Order</span>.find(...)
-  .map(&amp;<span class="dt">PComp</span>[<span class="st">:order_items</span>, 
-              <span class="st">:map</span>.with_args(&amp;<span class="dt">PComp</span>[<span class="st">:item</span>, 
-                                    <span class="st">:item_group</span>, 
-                                    <span class="dt">PSplat</span>[<span class="st">:id</span>, <span class="st">:name</span>]])])
-  .inject([], &amp;:&lt;&lt;).uniq</code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb2-1" title="1"><span class="dt">Order</span>.find(...)</a>
+<a class="sourceLine" id="cb2-2" title="2">  .map(&amp;<span class="dt">PComp</span>[<span class="st">:order_items</span>, </a>
+<a class="sourceLine" id="cb2-3" title="3">              <span class="st">:map</span>.with_args(&amp;<span class="dt">PComp</span>[<span class="st">:item</span>, </a>
+<a class="sourceLine" id="cb2-4" title="4">                                    <span class="st">:item_group</span>, </a>
+<a class="sourceLine" id="cb2-5" title="5">                                    <span class="dt">PSplat</span>[<span class="st">:id</span>, <span class="st">:name</span>]])])</a>
+<a class="sourceLine" id="cb2-6" title="6">  .inject([], &amp;:&lt;&lt;).uniq</a></code></pre></div>
 <p>Slightly longer, but still looks good and action is obvious here so I don’t need to count brackets. Now it also looks quite similar to Haskell arrows. <code>PSplat</code> resembles <code>&amp;&amp;&amp;</code>, only Ruby isn’t strong typed so I don’t need to limit myself with a fixed number of elements (pair in Haskell). What about <code>***</code> then? Well, let’s call it <code>PZip</code>:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="dt">PZip</span> =
-  lambda <span class="kw">do</span> |*xs|
-    ps = xs.map(&amp;<span class="st">:to_proc</span>)
-    lambda <span class="kw">do</span> |ys| 
-      ps.zip(ys).map <span class="kw">do</span> |p, e|
-        p[e]
-      <span class="kw">end</span>
-    <span class="kw">end</span>
-  <span class="kw">end</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb3-1" title="1"><span class="dt">PZip</span> =</a>
+<a class="sourceLine" id="cb3-2" title="2">  lambda <span class="kw">do</span> |*xs|</a>
+<a class="sourceLine" id="cb3-3" title="3">    ps = xs.map(&amp;<span class="st">:to_proc</span>)</a>
+<a class="sourceLine" id="cb3-4" title="4">    lambda <span class="kw">do</span> |ys| </a>
+<a class="sourceLine" id="cb3-5" title="5">      ps.zip(ys).map <span class="kw">do</span> |p, e|</a>
+<a class="sourceLine" id="cb3-6" title="6">        p[e]</a>
+<a class="sourceLine" id="cb3-7" title="7">      <span class="kw">end</span></a>
+<a class="sourceLine" id="cb3-8" title="8">    <span class="kw">end</span></a>
+<a class="sourceLine" id="cb3-9" title="9">  <span class="kw">end</span></a></code></pre></div>
 <p>How does this help? Let’s say I need to find frequencies:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby">[<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">2</span>,<span class="dv">3</span>,<span class="dv">3</span>,<span class="dv">3</span>,<span class="dv">4</span>,<span class="dv">5</span>]
-  .group_by(&amp;lambda { |x| x })
-  .map{ |k, v| [k, v.length] }</code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb4-1" title="1">[<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">2</span>,<span class="dv">3</span>,<span class="dv">3</span>,<span class="dv">3</span>,<span class="dv">4</span>,<span class="dv">5</span>]</a>
+<a class="sourceLine" id="cb4-2" title="2">  .group_by(&amp;lambda { |x| x })</a>
+<a class="sourceLine" id="cb4-3" title="3">  .map{ |k, v| [k, v.length] }</a></code></pre></div>
 <p>First of all <code>lambda { |x| x }</code> is used pretty often in point-free style (Haskell’s id), why not define it as:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="dt">PId</span> = 
-  lambda <span class="kw">do</span> |x| 
-    x
-  <span class="kw">end</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb5-1" title="1"><span class="dt">PId</span> = </a>
+<a class="sourceLine" id="cb5-2" title="2">  lambda <span class="kw">do</span> |x| </a>
+<a class="sourceLine" id="cb5-3" title="3">    x</a>
+<a class="sourceLine" id="cb5-4" title="4">  <span class="kw">end</span></a></code></pre></div>
 <p>Now I can rewrite frequencies as:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby">[<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">2</span>,<span class="dv">3</span>,<span class="dv">3</span>,<span class="dv">3</span>,<span class="dv">4</span>,<span class="dv">5</span>]
-  .group_by(&amp;<span class="dt">PId</span>)
-  .map(&amp;<span class="dt">PZip</span>[<span class="dt">PId</span>, <span class="st">:length</span>])</code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb6-1" title="1">[<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">2</span>,<span class="dv">3</span>,<span class="dv">3</span>,<span class="dv">3</span>,<span class="dv">4</span>,<span class="dv">5</span>]</a>
+<a class="sourceLine" id="cb6-2" title="2">  .group_by(&amp;<span class="dt">PId</span>)</a>
+<a class="sourceLine" id="cb6-3" title="3">  .map(&amp;<span class="dt">PZip</span>[<span class="dt">PId</span>, <span class="st">:length</span>])</a></code></pre></div>
 <p>In fact in this particular example <code>PZip</code> acts like Haskell’s <code>second</code>, but it’s just because I chose this simple case. Now let’s say I want to find all orders that match certain criteria:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="dt">Order</span>.find(<span class="st">:all</span>)
-  .select{ |order| order.customer.has_discount? &amp;&amp; 
-                   order.paid? &amp;&amp; order.shipped?   }</code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb7-1" title="1"><span class="dt">Order</span>.find(<span class="st">:all</span>)</a>
+<a class="sourceLine" id="cb7-2" title="2">  .select{ |order| order.customer.has_discount? &amp;&amp; </a>
+<a class="sourceLine" id="cb7-3" title="3">                   order.paid? &amp;&amp; order.shipped?   }</a></code></pre></div>
 <p>I can rewrite it as:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="dt">Order</span>.find(<span class="st">:all</span>)
-  .select(&amp;<span class="dt">PComp</span>[<span class="dt">PSplat</span>[<span class="dt">PComp</span>[<span class="st">:customer</span>, <span class="st">:has_discount?</span>],
-                        <span class="st">:paid?</span>,
-                        <span class="st">:shipped?</span>], 
-                 <span class="st">:all?</span>])</code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb8-1" title="1"><span class="dt">Order</span>.find(<span class="st">:all</span>)</a>
+<a class="sourceLine" id="cb8-2" title="2">  .select(&amp;<span class="dt">PComp</span>[<span class="dt">PSplat</span>[<span class="dt">PComp</span>[<span class="st">:customer</span>, <span class="st">:has_discount?</span>],</a>
+<a class="sourceLine" id="cb8-3" title="3">                        <span class="st">:paid?</span>,</a>
+<a class="sourceLine" id="cb8-4" title="4">                        <span class="st">:shipped?</span>], </a>
+<a class="sourceLine" id="cb8-5" title="5">                 <span class="st">:all?</span>])</a></code></pre></div>
 <p>or just</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="dt">Order</span>.find(<span class="st">:all</span>)
-  .select(&amp;<span class="dt">PAll</span>[<span class="dt">PComp</span>[<span class="st">:customer</span>, <span class="st">:has_discount?</span>],
-                <span class="st">:paid?</span>,
-                <span class="st">:shipped?</span>])</code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb9-1" title="1"><span class="dt">Order</span>.find(<span class="st">:all</span>)</a>
+<a class="sourceLine" id="cb9-2" title="2">  .select(&amp;<span class="dt">PAll</span>[<span class="dt">PComp</span>[<span class="st">:customer</span>, <span class="st">:has_discount?</span>],</a>
+<a class="sourceLine" id="cb9-3" title="3">                <span class="st">:paid?</span>,</a>
+<a class="sourceLine" id="cb9-4" title="4">                <span class="st">:shipped?</span>])</a></code></pre></div>
 <p>if I define additional lambdas (and it will be faster as they use lazy evaluation in <code>all?(&amp;block)</code> and <code>any?(&amp;block)</code>):</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="dt">PAny</span> =
-  lambda <span class="kw">do</span> |*xs|
-    ps = xs.map(&amp;<span class="st">:to_proc</span>)
-    lambda { |*ys| ps.any? { |p| p[*ys] } }
-  <span class="kw">end</span>
- 
-<span class="dt">PAll</span> =
-  lambda <span class="kw">do</span> |*xs|
-    ps = xs.map(&amp;<span class="st">:to_proc</span>)
-    lambda { |*ys| ps.all? { |p| p[*ys] } }
-  <span class="kw">end</span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb10-1" title="1"><span class="dt">PAny</span> =</a>
+<a class="sourceLine" id="cb10-2" title="2">  lambda <span class="kw">do</span> |*xs|</a>
+<a class="sourceLine" id="cb10-3" title="3">    ps = xs.map(&amp;<span class="st">:to_proc</span>)</a>
+<a class="sourceLine" id="cb10-4" title="4">    lambda { |*ys| ps.any? { |p| p[*ys] } }</a>
+<a class="sourceLine" id="cb10-5" title="5">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb10-6" title="6"> </a>
+<a class="sourceLine" id="cb10-7" title="7"><span class="dt">PAll</span> =</a>
+<a class="sourceLine" id="cb10-8" title="8">  lambda <span class="kw">do</span> |*xs|</a>
+<a class="sourceLine" id="cb10-9" title="9">    ps = xs.map(&amp;<span class="st">:to_proc</span>)</a>
+<a class="sourceLine" id="cb10-10" title="10">    lambda { |*ys| ps.all? { |p| p[*ys] } }</a>
+<a class="sourceLine" id="cb10-11" title="11">  <span class="kw">end</span></a></code></pre></div>
 
         </div>
 

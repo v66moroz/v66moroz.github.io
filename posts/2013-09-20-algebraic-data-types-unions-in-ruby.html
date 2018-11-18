@@ -42,155 +42,155 @@
 </div>
 
 <p>Let’s consider a simple tree defined in Haskell as</p>
-<div class="sourceCode"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Tree</span> a <span class="fu">=</span> <span class="dt">Empty</span>
-          <span class="fu">|</span> <span class="dt">Node</span> a (<span class="dt">Tree</span> a) (<span class="dt">Tree</span> a)</code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb1-1" title="1"><span class="kw">data</span> <span class="dt">Tree</span> a <span class="fu">=</span> <span class="dt">Empty</span></a>
+<a class="sourceLine" id="cb1-2" title="2">          <span class="fu">|</span> <span class="dt">Node</span> a (<span class="dt">Tree</span> a) (<span class="dt">Tree</span> a)</a></code></pre></div>
 <p>Naive Ruby’s approach would be defining a class <code>Node</code> and assuming node is a leaf when both left and right sub-trees are <code>nil</code> (i. e. <code>nil</code> is representing an empty tree):</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">class</span> <span class="dt">Node</span>
-  <span class="kw">def</span> initialize(v, left, right)
-    <span class="ot">@v</span>, <span class="ot">@left</span>, <span class="ot">@right</span> = v, left, right
-  <span class="kw">end</span>
- 
-  <span class="kw">def</span> each(&amp;block)
-    <span class="ot">@left</span>.each(&amp;block) <span class="kw">if</span> <span class="ot">@left</span>
-    block[<span class="ot">@v</span>]
-    <span class="ot">@right</span>.each(&amp;block) <span class="kw">if</span> <span class="ot">@right</span>
-  <span class="kw">end</span>
-<span class="kw">end</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb2-1" title="1"><span class="kw">class</span> <span class="dt">Node</span></a>
+<a class="sourceLine" id="cb2-2" title="2">  <span class="kw">def</span> initialize(v, left, right)</a>
+<a class="sourceLine" id="cb2-3" title="3">    <span class="ot">@v</span>, <span class="ot">@left</span>, <span class="ot">@right</span> = v, left, right</a>
+<a class="sourceLine" id="cb2-4" title="4">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb2-5" title="5"> </a>
+<a class="sourceLine" id="cb2-6" title="6">  <span class="kw">def</span> each(&amp;block)</a>
+<a class="sourceLine" id="cb2-7" title="7">    <span class="ot">@left</span>.each(&amp;block) <span class="kw">if</span> <span class="ot">@left</span></a>
+<a class="sourceLine" id="cb2-8" title="8">    block[<span class="ot">@v</span>]</a>
+<a class="sourceLine" id="cb2-9" title="9">    <span class="ot">@right</span>.each(&amp;block) <span class="kw">if</span> <span class="ot">@right</span></a>
+<a class="sourceLine" id="cb2-10" title="10">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb2-11" title="11"><span class="kw">end</span></a></code></pre></div>
 <p>But it doesn’t work well. First of all <code>if @left</code> is not a good recursive approach, but more importantly there is no standalone representation of an empty tree. But unions can be represented by using inheritance:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">class</span> <span class="dt">Tree</span>
-  <span class="kw">def</span> <span class="dv">self</span>.empty
-    <span class="dt">Empty</span>.new
-  <span class="kw">end</span>
- 
-  <span class="kw">def</span> flatten
-    vs = []
-    each <span class="kw">do</span> |v|
-      vs &lt;&lt; v
-    <span class="kw">end</span>
-    vs
-  <span class="kw">end</span>
-<span class="kw">end</span>
- 
-<span class="kw">class</span> <span class="dt">Empty</span> &lt; <span class="dt">Tree</span>
-  <span class="kw">def</span> each
-  <span class="kw">end</span>
- 
-  <span class="kw">def</span> append(v)
-    <span class="dt">Node</span>.new(v, <span class="dt">Tree</span>.empty, <span class="dt">Tree</span>.empty)
-  <span class="kw">end</span>
-<span class="kw">end</span>
- 
-<span class="kw">class</span> <span class="dt">Node</span> &lt; <span class="dt">Tree</span>
-  <span class="kw">def</span> initialize(v, left, right)
-    <span class="ot">@v</span>, <span class="ot">@left</span>, <span class="ot">@right</span> = v, left, right
-  <span class="kw">end</span>
- 
-  <span class="kw">def</span> each(&amp;block)
-    <span class="ot">@left</span>.each(&amp;block)
-    block[<span class="ot">@v</span>]
-    <span class="ot">@right</span>.each(&amp;block)
-  <span class="kw">end</span>   
- 
-  <span class="kw">def</span> append(v)
-    <span class="kw">if</span> v &lt; <span class="ot">@v</span>
-      <span class="dt">Node</span>.new(<span class="ot">@v</span>, <span class="ot">@left</span>.append(v), <span class="ot">@right</span>)
-    <span class="kw">elsif</span> v &gt; <span class="ot">@v</span>
-      <span class="dt">Node</span>.new(<span class="ot">@v</span>, <span class="ot">@left</span>, <span class="ot">@right</span>.append(v))
-    <span class="kw">else</span>
-      <span class="dv">self</span>
-    <span class="kw">end</span>
-  <span class="kw">end</span>
-<span class="kw">end</span>
- 
-<span class="dt">Tree</span>.empty.append(<span class="dv">1</span>).append(<span class="dv">0</span>).append(<span class="dv">3</span>).flatten
-<span class="co">#=&gt; [0, 1, 3]</span></code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb3-1" title="1"><span class="kw">class</span> <span class="dt">Tree</span></a>
+<a class="sourceLine" id="cb3-2" title="2">  <span class="kw">def</span> <span class="dv">self</span>.empty</a>
+<a class="sourceLine" id="cb3-3" title="3">    <span class="dt">Empty</span>.new</a>
+<a class="sourceLine" id="cb3-4" title="4">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb3-5" title="5"> </a>
+<a class="sourceLine" id="cb3-6" title="6">  <span class="kw">def</span> flatten</a>
+<a class="sourceLine" id="cb3-7" title="7">    vs = []</a>
+<a class="sourceLine" id="cb3-8" title="8">    each <span class="kw">do</span> |v|</a>
+<a class="sourceLine" id="cb3-9" title="9">      vs &lt;&lt; v</a>
+<a class="sourceLine" id="cb3-10" title="10">    <span class="kw">end</span></a>
+<a class="sourceLine" id="cb3-11" title="11">    vs</a>
+<a class="sourceLine" id="cb3-12" title="12">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb3-13" title="13"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb3-14" title="14"> </a>
+<a class="sourceLine" id="cb3-15" title="15"><span class="kw">class</span> <span class="dt">Empty</span> &lt; <span class="dt">Tree</span></a>
+<a class="sourceLine" id="cb3-16" title="16">  <span class="kw">def</span> each</a>
+<a class="sourceLine" id="cb3-17" title="17">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb3-18" title="18"> </a>
+<a class="sourceLine" id="cb3-19" title="19">  <span class="kw">def</span> append(v)</a>
+<a class="sourceLine" id="cb3-20" title="20">    <span class="dt">Node</span>.new(v, <span class="dt">Tree</span>.empty, <span class="dt">Tree</span>.empty)</a>
+<a class="sourceLine" id="cb3-21" title="21">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb3-22" title="22"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb3-23" title="23"> </a>
+<a class="sourceLine" id="cb3-24" title="24"><span class="kw">class</span> <span class="dt">Node</span> &lt; <span class="dt">Tree</span></a>
+<a class="sourceLine" id="cb3-25" title="25">  <span class="kw">def</span> initialize(v, left, right)</a>
+<a class="sourceLine" id="cb3-26" title="26">    <span class="ot">@v</span>, <span class="ot">@left</span>, <span class="ot">@right</span> = v, left, right</a>
+<a class="sourceLine" id="cb3-27" title="27">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb3-28" title="28"> </a>
+<a class="sourceLine" id="cb3-29" title="29">  <span class="kw">def</span> each(&amp;block)</a>
+<a class="sourceLine" id="cb3-30" title="30">    <span class="ot">@left</span>.each(&amp;block)</a>
+<a class="sourceLine" id="cb3-31" title="31">    block[<span class="ot">@v</span>]</a>
+<a class="sourceLine" id="cb3-32" title="32">    <span class="ot">@right</span>.each(&amp;block)</a>
+<a class="sourceLine" id="cb3-33" title="33">  <span class="kw">end</span>   </a>
+<a class="sourceLine" id="cb3-34" title="34"> </a>
+<a class="sourceLine" id="cb3-35" title="35">  <span class="kw">def</span> append(v)</a>
+<a class="sourceLine" id="cb3-36" title="36">    <span class="kw">if</span> v &lt; <span class="ot">@v</span></a>
+<a class="sourceLine" id="cb3-37" title="37">      <span class="dt">Node</span>.new(<span class="ot">@v</span>, <span class="ot">@left</span>.append(v), <span class="ot">@right</span>)</a>
+<a class="sourceLine" id="cb3-38" title="38">    <span class="kw">elsif</span> v &gt; <span class="ot">@v</span></a>
+<a class="sourceLine" id="cb3-39" title="39">      <span class="dt">Node</span>.new(<span class="ot">@v</span>, <span class="ot">@left</span>, <span class="ot">@right</span>.append(v))</a>
+<a class="sourceLine" id="cb3-40" title="40">    <span class="kw">else</span></a>
+<a class="sourceLine" id="cb3-41" title="41">      <span class="dv">self</span></a>
+<a class="sourceLine" id="cb3-42" title="42">    <span class="kw">end</span></a>
+<a class="sourceLine" id="cb3-43" title="43">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb3-44" title="44"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb3-45" title="45"> </a>
+<a class="sourceLine" id="cb3-46" title="46"><span class="dt">Tree</span>.empty.append(<span class="dv">1</span>).append(<span class="dv">0</span>).append(<span class="dv">3</span>).flatten</a>
+<a class="sourceLine" id="cb3-47" title="47"><span class="co">#=&gt; [0, 1, 3]</span></a></code></pre></div>
 <p>Now I can add a bunch of methods to the <code>Tree</code> class based on <code>each</code>, e. g. <code>map</code>. I don’t want to include <code>Enumerable</code> because that <code>map</code> will return me an array, but what I really want is the same data structure, i. e. <code>Tree</code>.</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">class</span> <span class="dt">Tree</span>
- 
-...
- 
-  <span class="kw">def</span> fmap(&amp;block)
-    r = <span class="dv">self</span>.class.empty
-    each <span class="kw">do</span> |v| 
-      r = r.append(block[v])
-    <span class="kw">end</span>
-    r
-  <span class="kw">end</span>
-<span class="kw">end</span>
-
-p <span class="dt">Tree</span>.empty.append(<span class="dv">1</span>).append(<span class="dv">0</span>).append(<span class="dv">3</span>).fmap { |x| - x }.flatten
-<span class="co">#=&gt; [-3, -1, 0]</span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb4-1" title="1"><span class="kw">class</span> <span class="dt">Tree</span></a>
+<a class="sourceLine" id="cb4-2" title="2"> </a>
+<a class="sourceLine" id="cb4-3" title="3">...</a>
+<a class="sourceLine" id="cb4-4" title="4"> </a>
+<a class="sourceLine" id="cb4-5" title="5">  <span class="kw">def</span> fmap(&amp;block)</a>
+<a class="sourceLine" id="cb4-6" title="6">    r = <span class="dv">self</span>.class.empty</a>
+<a class="sourceLine" id="cb4-7" title="7">    each <span class="kw">do</span> |v| </a>
+<a class="sourceLine" id="cb4-8" title="8">      r = r.append(block[v])</a>
+<a class="sourceLine" id="cb4-9" title="9">    <span class="kw">end</span></a>
+<a class="sourceLine" id="cb4-10" title="10">    r</a>
+<a class="sourceLine" id="cb4-11" title="11">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb4-12" title="12"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb4-13" title="13"></a>
+<a class="sourceLine" id="cb4-14" title="14">p <span class="dt">Tree</span>.empty.append(<span class="dv">1</span>).append(<span class="dv">0</span>).append(<span class="dv">3</span>).fmap { |x| - x }.flatten</a>
+<a class="sourceLine" id="cb4-15" title="15"><span class="co">#=&gt; [-3, -1, 0]</span></a></code></pre></div>
 <p>Meanwhile the implementation of <code>fmap</code> is based on two methods: <code>self.empty</code> and <code>append</code>, so if I define those methods for any other class I can get <code>fmap</code> for free (I will rename them to <code>fempty</code> and <code>fappend</code> so I don’t clash with Ruby names). I have always wondered why map over a <code>Hash</code> returns an <code>Array</code> while it should have returned a <code>Hash</code>:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">module</span> <span class="dt">Functor</span>
-  <span class="kw">def</span> fmap(&amp;block)
-    r = <span class="dv">self</span>.class.fempty
-    each <span class="kw">do</span> |v| 
-      r = r.fappend(block[v])
-    <span class="kw">end</span>
-    r
-  <span class="kw">end</span>
-<span class="kw">end</span>
- 
-<span class="kw">class</span> <span class="dt">Hash</span>
-  include <span class="dt">Functor</span>
- 
-  <span class="kw">class</span> &lt;&lt; <span class="dv">self</span>
-    <span class="kw">alias</span> <span class="st">:fempty</span> <span class="st">:new</span>
-  <span class="kw">end</span>
- 
-  <span class="co"># Not very functional</span>
-  <span class="kw">def</span> fappend(kv)
-    k, v = kv
-    <span class="dv">self</span>[k] = v
-    <span class="dv">self</span>
-  <span class="kw">end</span>
-<span class="kw">end</span>
- 
-{ <span class="st">:a</span> =&gt; <span class="dv">1</span> }.fmap { |k, v| [k, <span class="dv">3</span>] }
-<span class="co">#=&gt; {:a =&gt; 3}</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb5-1" title="1"><span class="kw">module</span> <span class="dt">Functor</span></a>
+<a class="sourceLine" id="cb5-2" title="2">  <span class="kw">def</span> fmap(&amp;block)</a>
+<a class="sourceLine" id="cb5-3" title="3">    r = <span class="dv">self</span>.class.fempty</a>
+<a class="sourceLine" id="cb5-4" title="4">    each <span class="kw">do</span> |v| </a>
+<a class="sourceLine" id="cb5-5" title="5">      r = r.fappend(block[v])</a>
+<a class="sourceLine" id="cb5-6" title="6">    <span class="kw">end</span></a>
+<a class="sourceLine" id="cb5-7" title="7">    r</a>
+<a class="sourceLine" id="cb5-8" title="8">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb5-9" title="9"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb5-10" title="10"> </a>
+<a class="sourceLine" id="cb5-11" title="11"><span class="kw">class</span> <span class="dt">Hash</span></a>
+<a class="sourceLine" id="cb5-12" title="12">  include <span class="dt">Functor</span></a>
+<a class="sourceLine" id="cb5-13" title="13"> </a>
+<a class="sourceLine" id="cb5-14" title="14">  <span class="kw">class</span> &lt;&lt; <span class="dv">self</span></a>
+<a class="sourceLine" id="cb5-15" title="15">    <span class="kw">alias</span> <span class="st">:fempty</span> <span class="st">:new</span></a>
+<a class="sourceLine" id="cb5-16" title="16">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb5-17" title="17"> </a>
+<a class="sourceLine" id="cb5-18" title="18">  <span class="co"># Not very functional</span></a>
+<a class="sourceLine" id="cb5-19" title="19">  <span class="kw">def</span> fappend(kv)</a>
+<a class="sourceLine" id="cb5-20" title="20">    k, v = kv</a>
+<a class="sourceLine" id="cb5-21" title="21">    <span class="dv">self</span>[k] = v</a>
+<a class="sourceLine" id="cb5-22" title="22">    <span class="dv">self</span></a>
+<a class="sourceLine" id="cb5-23" title="23">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb5-24" title="24"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb5-25" title="25"> </a>
+<a class="sourceLine" id="cb5-26" title="26">{ <span class="st">:a</span> =&gt; <span class="dv">1</span> }.fmap { |k, v| [k, <span class="dv">3</span>] }</a>
+<a class="sourceLine" id="cb5-27" title="27"><span class="co">#=&gt; {:a =&gt; 3}</span></a></code></pre></div>
 <p>Linked list can be defined in a similar fashion:</p>
-<div class="sourceCode"><pre class="sourceCode ruby"><code class="sourceCode ruby"><span class="kw">class</span> <span class="dt">List</span>
-  include <span class="dt">Functor</span>
- 
-  <span class="kw">class</span> &lt;&lt; <span class="dv">self</span>
-    <span class="kw">alias</span> <span class="st">:fempty</span> <span class="st">:new</span>
-  <span class="kw">end</span>
- 
-  <span class="kw">def</span> to_a
-    xs = []
-    each <span class="kw">do</span> |x|
-      xs &lt;&lt; x
-    <span class="kw">end</span>
-    xs
-  <span class="kw">end</span>
-<span class="kw">end</span>
- 
-<span class="kw">class</span> <span class="dt">Empty</span> &lt; <span class="dt">List</span>
-  <span class="kw">def</span> each
-  <span class="kw">end</span>
- 
-  <span class="kw">def</span> fappend(v)
-    <span class="dt">Cons</span>.new(v, <span class="dt">List</span>.fempty)
-  <span class="kw">end</span>
-<span class="kw">end</span>
- 
-<span class="kw">class</span> <span class="dt">Cons</span> &lt; <span class="dt">List</span>
-  <span class="kw">def</span> initialize(h, t)
-    <span class="ot">@h</span>, <span class="ot">@t</span> = h, t
-  <span class="kw">end</span>
- 
-  <span class="kw">def</span> each(&amp;block)
-    block[<span class="ot">@h</span>]
-    <span class="ot">@t</span>.each(&amp;block)
-  <span class="kw">end</span>
- 
-  <span class="kw">def</span> fappend(v)
-    <span class="dt">Cons</span>.new(v, <span class="dv">self</span>)
-  <span class="kw">end</span>
-<span class="kw">end</span>
- 
-<span class="dt">List</span>.fempty.fappend(<span class="dv">1</span>).fappend(<span class="dv">2</span>).fmap{ |x| x + <span class="dv">1</span> }.to_a
-<span class="co">#=&gt; [2, 3]</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb6-1" title="1"><span class="kw">class</span> <span class="dt">List</span></a>
+<a class="sourceLine" id="cb6-2" title="2">  include <span class="dt">Functor</span></a>
+<a class="sourceLine" id="cb6-3" title="3"> </a>
+<a class="sourceLine" id="cb6-4" title="4">  <span class="kw">class</span> &lt;&lt; <span class="dv">self</span></a>
+<a class="sourceLine" id="cb6-5" title="5">    <span class="kw">alias</span> <span class="st">:fempty</span> <span class="st">:new</span></a>
+<a class="sourceLine" id="cb6-6" title="6">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb6-7" title="7"> </a>
+<a class="sourceLine" id="cb6-8" title="8">  <span class="kw">def</span> to_a</a>
+<a class="sourceLine" id="cb6-9" title="9">    xs = []</a>
+<a class="sourceLine" id="cb6-10" title="10">    each <span class="kw">do</span> |x|</a>
+<a class="sourceLine" id="cb6-11" title="11">      xs &lt;&lt; x</a>
+<a class="sourceLine" id="cb6-12" title="12">    <span class="kw">end</span></a>
+<a class="sourceLine" id="cb6-13" title="13">    xs</a>
+<a class="sourceLine" id="cb6-14" title="14">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb6-15" title="15"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb6-16" title="16"> </a>
+<a class="sourceLine" id="cb6-17" title="17"><span class="kw">class</span> <span class="dt">Empty</span> &lt; <span class="dt">List</span></a>
+<a class="sourceLine" id="cb6-18" title="18">  <span class="kw">def</span> each</a>
+<a class="sourceLine" id="cb6-19" title="19">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb6-20" title="20"> </a>
+<a class="sourceLine" id="cb6-21" title="21">  <span class="kw">def</span> fappend(v)</a>
+<a class="sourceLine" id="cb6-22" title="22">    <span class="dt">Cons</span>.new(v, <span class="dt">List</span>.fempty)</a>
+<a class="sourceLine" id="cb6-23" title="23">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb6-24" title="24"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb6-25" title="25"> </a>
+<a class="sourceLine" id="cb6-26" title="26"><span class="kw">class</span> <span class="dt">Cons</span> &lt; <span class="dt">List</span></a>
+<a class="sourceLine" id="cb6-27" title="27">  <span class="kw">def</span> initialize(h, t)</a>
+<a class="sourceLine" id="cb6-28" title="28">    <span class="ot">@h</span>, <span class="ot">@t</span> = h, t</a>
+<a class="sourceLine" id="cb6-29" title="29">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb6-30" title="30"> </a>
+<a class="sourceLine" id="cb6-31" title="31">  <span class="kw">def</span> each(&amp;block)</a>
+<a class="sourceLine" id="cb6-32" title="32">    block[<span class="ot">@h</span>]</a>
+<a class="sourceLine" id="cb6-33" title="33">    <span class="ot">@t</span>.each(&amp;block)</a>
+<a class="sourceLine" id="cb6-34" title="34">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb6-35" title="35"> </a>
+<a class="sourceLine" id="cb6-36" title="36">  <span class="kw">def</span> fappend(v)</a>
+<a class="sourceLine" id="cb6-37" title="37">    <span class="dt">Cons</span>.new(v, <span class="dv">self</span>)</a>
+<a class="sourceLine" id="cb6-38" title="38">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb6-39" title="39"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb6-40" title="40"> </a>
+<a class="sourceLine" id="cb6-41" title="41"><span class="dt">List</span>.fempty.fappend(<span class="dv">1</span>).fappend(<span class="dv">2</span>).fmap{ |x| x + <span class="dv">1</span> }.to_a</a>
+<a class="sourceLine" id="cb6-42" title="42"><span class="co">#=&gt; [2, 3]</span></a></code></pre></div>
 
         </div>
 

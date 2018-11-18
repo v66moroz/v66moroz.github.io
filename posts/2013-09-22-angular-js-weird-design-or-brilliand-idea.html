@@ -42,22 +42,22 @@
 </div>
 
 <p>Ahem, I have always thought the difference between parameters and arguments are there for a reason and I can use an arbitrary parameter name for my function. It’s probably called a local scope. Well, not AngularJS <code>$scope</code>:</p>
-<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="ot">window</span>.<span class="fu">SomeCtrl</span> = <span class="kw">function</span>($scope) { ... }  <span class="co">//works</span>
-<span class="ot">window</span>.<span class="fu">SomeCtrl</span> = <span class="kw">function</span>($myScope) { ... } <span class="co">//doesn't work</span></code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode javascript"><code class="sourceCode javascript"><a class="sourceLine" id="cb1-1" title="1"><span class="va">window</span>.<span class="at">SomeCtrl</span> <span class="op">=</span> <span class="kw">function</span>($scope) <span class="op">{</span> ... <span class="op">}</span>  <span class="co">//works</span></a>
+<a class="sourceLine" id="cb1-2" title="2"><span class="va">window</span>.<span class="at">SomeCtrl</span> <span class="op">=</span> <span class="kw">function</span>($myScope) <span class="op">{</span> ... <span class="op">}</span> <span class="co">//doesn't work</span></a></code></pre></div>
 <p>The reason why the latter doesn’t work is because AngularJs pretends to be source code parser:</p>
-<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="kw">if</span> (<span class="kw">typeof</span> fn == <span class="st">'function'</span>) {
-  <span class="kw">if</span> (!($inject = <span class="ot">fn</span>.<span class="fu">$inject</span>)) {
-    $inject = [];
-    fnText = <span class="ot">fn</span>.<span class="fu">toString</span>().<span class="fu">replace</span>(STRIP_COMMENTS, <span class="st">''</span>);
-    argDecl = <span class="ot">fnText</span>.<span class="fu">match</span>(FN_ARGS);
-    <span class="fu">forEach</span>(argDecl[<span class="dv">1</span>].<span class="fu">split</span>(FN_ARG_SPLIT), <span class="kw">function</span>(arg){
-      <span class="ot">arg</span>.<span class="fu">replace</span>(FN_ARG, <span class="kw">function</span>(all, underscore, name){
-        <span class="ot">$inject</span>.<span class="fu">push</span>(name);
-      });
-    });
-    <span class="ot">fn</span>.<span class="fu">$inject</span> = $inject;
-  }
-}</code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode javascript"><code class="sourceCode javascript"><a class="sourceLine" id="cb2-1" title="1"><span class="cf">if</span> (<span class="kw">typeof</span> fn <span class="op">==</span> <span class="st">'function'</span>) <span class="op">{</span></a>
+<a class="sourceLine" id="cb2-2" title="2">  <span class="cf">if</span> (<span class="op">!</span>($inject <span class="op">=</span> <span class="va">fn</span>.<span class="at">$inject</span>)) <span class="op">{</span></a>
+<a class="sourceLine" id="cb2-3" title="3">    $inject <span class="op">=</span> []<span class="op">;</span></a>
+<a class="sourceLine" id="cb2-4" title="4">    fnText <span class="op">=</span> <span class="va">fn</span>.<span class="at">toString</span>().<span class="at">replace</span>(STRIP_COMMENTS<span class="op">,</span> <span class="st">''</span>)<span class="op">;</span></a>
+<a class="sourceLine" id="cb2-5" title="5">    argDecl <span class="op">=</span> <span class="va">fnText</span>.<span class="at">match</span>(FN_ARGS)<span class="op">;</span></a>
+<a class="sourceLine" id="cb2-6" title="6">    <span class="at">forEach</span>(argDecl[<span class="dv">1</span>].<span class="at">split</span>(FN_ARG_SPLIT)<span class="op">,</span> <span class="kw">function</span>(arg)<span class="op">{</span></a>
+<a class="sourceLine" id="cb2-7" title="7">      <span class="va">arg</span>.<span class="at">replace</span>(FN_ARG<span class="op">,</span> <span class="kw">function</span>(all<span class="op">,</span> underscore<span class="op">,</span> name)<span class="op">{</span></a>
+<a class="sourceLine" id="cb2-8" title="8">        <span class="va">$inject</span>.<span class="at">push</span>(name)<span class="op">;</span></a>
+<a class="sourceLine" id="cb2-9" title="9">      <span class="op">}</span>)<span class="op">;</span></a>
+<a class="sourceLine" id="cb2-10" title="10">    <span class="op">}</span>)<span class="op">;</span></a>
+<a class="sourceLine" id="cb2-11" title="11">    <span class="va">fn</span>.<span class="at">$inject</span> <span class="op">=</span> $inject<span class="op">;</span></a>
+<a class="sourceLine" id="cb2-12" title="12">  <span class="op">}</span></a>
+<a class="sourceLine" id="cb2-13" title="13"><span class="op">}</span></a></code></pre></div>
 <p>Not that I’m against reflection, but this looks like a super-reflection. Next step in this direction would be to modify source code on the fly and re-eval it.</p>
 
         </div>

@@ -43,59 +43,59 @@
 
 <p>What is currying? From <a href="http://en.wikipedia.org/wiki/Currying">Wikipedia</a> currying is the technique of translating the evaluation of a function that takes multiple arguments (or a tuple of arguments) into evaluating a sequence of functions. Let’s not dive into lambda calculus, but look at it from a developer’s perspective. How does it help in real live?</p>
 <h3 id="haskell">Haskell</h3>
-<div class="sourceCode"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">let</span> f1 <span class="fu">=</span> \x y z <span class="ot">-&gt;</span> x <span class="fu">+</span> y <span class="fu">+</span> z 
-<span class="co">-- f1 :: Integer -&gt; Integer -&gt; Integer -&gt; Integer</span>
-
-<span class="kw">let</span> f2 <span class="fu">=</span> \x <span class="ot">-&gt;</span> \y <span class="ot">-&gt;</span> \z <span class="ot">-&gt;</span> x <span class="fu">+</span> y <span class="fu">+</span> z 
-<span class="co">-- f2 :: Integer -&gt; Integer -&gt; Integer -&gt; Integer</span></code></pre></div>
+<div class="sourceCode" id="cb1"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb1-1" title="1"><span class="kw">let</span> f1 <span class="fu">=</span> \x y z <span class="ot">-&gt;</span> x <span class="fu">+</span> y <span class="fu">+</span> z </a>
+<a class="sourceLine" id="cb1-2" title="2"><span class="co">-- f1 :: Integer -&gt; Integer -&gt; Integer -&gt; Integer</span></a>
+<a class="sourceLine" id="cb1-3" title="3"></a>
+<a class="sourceLine" id="cb1-4" title="4"><span class="kw">let</span> f2 <span class="fu">=</span> \x <span class="ot">-&gt;</span> \y <span class="ot">-&gt;</span> \z <span class="ot">-&gt;</span> x <span class="fu">+</span> y <span class="fu">+</span> z </a>
+<a class="sourceLine" id="cb1-5" title="5"><span class="co">-- f2 :: Integer -&gt; Integer -&gt; Integer -&gt; Integer</span></a></code></pre></div>
 <p>As we can see from types these two definitions are equivalent. All arguments are treated equally and distinguished only by their position. Given proper order it allows to create elegant transformations:</p>
-<div class="sourceCode"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span class="kw">let</span> add_2 <span class="fu">=</span> map (<span class="dv">2</span> <span class="fu">+</span>)
-<span class="co">-- add_2 :: [Integer] -&gt; [Integer]</span>
-
-add_2 [<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>]
-<span class="co">-- [3,4,5]</span></code></pre></div>
+<div class="sourceCode" id="cb2"><pre class="sourceCode haskell"><code class="sourceCode haskell"><a class="sourceLine" id="cb2-1" title="1"><span class="kw">let</span> add_2 <span class="fu">=</span> <span class="fu">map</span> (<span class="dv">2</span> <span class="fu">+</span>)</a>
+<a class="sourceLine" id="cb2-2" title="2"><span class="co">-- add_2 :: [Integer] -&gt; [Integer]</span></a>
+<a class="sourceLine" id="cb2-3" title="3"></a>
+<a class="sourceLine" id="cb2-4" title="4">add_2 [<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>]</a>
+<a class="sourceLine" id="cb2-5" title="5"><span class="co">-- [3,4,5]</span></a></code></pre></div>
 <p>We used currying twice here: <code>(2 +)</code> creates a single argument function which adds <code>2</code> to it’s argument, then <code>map (2 +)</code> creates a single argument function which takes a list and applies previously defined function to every element of it. Nice and clean.</p>
 <h3 id="scala">Scala</h3>
 <p>To start with, Scala doesn’t have Haskell-type functions. In fact, every functional object in Scala is a <em>method</em>. What’s the difference? Scala is OO language, so it works with objects. Objects consist of a state and methods, so every method is attached to some object. What does it change? Well, every method has an additional implicit argument, called <code>this</code>. So when we write <code>2 + 3</code> we in fact call some polymorphic function <code>@+(2, 3)</code>, which in OO notation looks like <code>2.+(3)</code>. As a result not all arguments are created equal and currying becomes much less elegant. Let’s write <code>(2 +)</code> in Scala:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">val</span> plus_2: Int =&gt; Int = <span class="dv">2</span>.`+`</code></pre></div>
+<div class="sourceCode" id="cb3"><pre class="sourceCode scala"><code class="sourceCode scala"><a class="sourceLine" id="cb3-1" title="1"><span class="kw">val</span> plus_<span class="dv">2</span>: Int =&gt; Int = <span class="fl">2.</span>`+`</a></code></pre></div>
 <p>Looks almost like Haskell, right? Wrong! What is happening here is called eta-expansion, which converts method to a function. That’s the reason why we need to specify type here. And by the way, <em>function</em> in Scala is an object which defines <code>apply()</code>. So compiler effectively created a transformation of one object into another, which is roughly equivalent to:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">val</span> plus_2: Int =&gt; Int =
-  <span class="kw">new</span> Function1[Int, Int] {
-    <span class="kw">def</span> <span class="fu">apply</span>(x: Int) = <span class="dv">2</span> + x
-  } </code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode scala"><code class="sourceCode scala"><a class="sourceLine" id="cb4-1" title="1"><span class="kw">val</span> plus_<span class="dv">2</span>: Int =&gt; Int =</a>
+<a class="sourceLine" id="cb4-2" title="2">  <span class="kw">new</span> Function1[Int, Int] {</a>
+<a class="sourceLine" id="cb4-3" title="3">    <span class="kw">def</span> <span class="fu">apply</span>(x: Int) = <span class="dv">2</span> + x</a>
+<a class="sourceLine" id="cb4-4" title="4">  } </a></code></pre></div>
 <p>But similarities with Haskell stop here. Next step is to write <code>map plus_2</code> and we are stuck. Since any method is attached to an object, <code>map</code> belongs to something. It can’t belong to <code>plus_2</code> since <code>plus_2</code> is just a generic <code>&lt;function1&gt;</code>. So it belongs to an instance of e.g. <code>List</code> (i.e. the first argument is always a <code>List</code>). But I’m not interested in creating generic transformation for a specific instance of a <code>List</code>. I can always define a partial function, but the simplicity is lost.</p>
 <p>To curry a method with more than one parameter we can use <code>curried</code>, but <code>curried</code> only applies to a <code>&lt;functionN&gt;</code> and eta-expansion is not applicable in this context, so we have to use <code>_</code>:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">(List(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>).<span class="fu">indexOf</span> _).<span class="fu">curried</span>
-<span class="co">// Any =&gt; (Int =&gt; Int) = &lt;function1&gt;</span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode scala"><code class="sourceCode scala"><a class="sourceLine" id="cb5-1" title="1">(List(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>).<span class="fu">indexOf</span> _).<span class="fu">curried</span></a>
+<a class="sourceLine" id="cb5-2" title="2"><span class="co">// Any =&gt; (Int =&gt; Int) = &lt;function1&gt;</span></a></code></pre></div>
 <p>What is interesting in the above example is <code>Any</code>, it’s presumably there because there are two versions of <code>indexOf</code>, with one and two arguments, but <code>curried</code> in fact uses the second one because the first parameter has the same type in both and it’s not possible to distinguish between them by analyzing the first argument.</p>
 <p>Okay, that hasn’t worked well so far. What about multiple parameter lists? They are what is usually called currying in Scala. They don’t pass a basic test though, multiple parameter <em>lists</em> mean exactly that, <em>lists</em>. A list can have a size of 0, 1, 2 …</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">x1</span>(a: Int)(b: Int) = <span class="dv">1</span>
-<span class="co">// x1: (a: Int)(b: Int)Int</span>
-
-<span class="kw">def</span> <span class="fu">x2</span>()(b: Int) = <span class="dv">1</span>
-<span class="co">// x2: ()(b: Int)Int</span>
-
-<span class="kw">def</span> <span class="fu">x3</span>(a: Int)() = <span class="dv">1</span>
-<span class="co">// x3: (a: Int)()Int</span>
-
-<span class="kw">def</span> <span class="fu">x4</span>(a: Int, b: Int)(c: Int) = <span class="dv">1</span>
-<span class="co">// x4: (a: Int, b: Int)(c: Int)Int</span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode scala"><code class="sourceCode scala"><a class="sourceLine" id="cb6-1" title="1"><span class="kw">def</span> <span class="fu">x1</span>(a: Int)(b: Int) = <span class="dv">1</span></a>
+<a class="sourceLine" id="cb6-2" title="2"><span class="co">// x1: (a: Int)(b: Int)Int</span></a>
+<a class="sourceLine" id="cb6-3" title="3"></a>
+<a class="sourceLine" id="cb6-4" title="4"><span class="kw">def</span> <span class="fu">x2</span>()(b: Int) = <span class="dv">1</span></a>
+<a class="sourceLine" id="cb6-5" title="5"><span class="co">// x2: ()(b: Int)Int</span></a>
+<a class="sourceLine" id="cb6-6" title="6"></a>
+<a class="sourceLine" id="cb6-7" title="7"><span class="kw">def</span> <span class="fu">x3</span>(a: Int)() = <span class="dv">1</span></a>
+<a class="sourceLine" id="cb6-8" title="8"><span class="co">// x3: (a: Int)()Int</span></a>
+<a class="sourceLine" id="cb6-9" title="9"></a>
+<a class="sourceLine" id="cb6-10" title="10"><span class="kw">def</span> <span class="fu">x4</span>(a: Int, b: Int)(c: Int) = <span class="dv">1</span></a>
+<a class="sourceLine" id="cb6-11" title="11"><span class="co">// x4: (a: Int, b: Int)(c: Int)Int</span></a></code></pre></div>
 <p>Let’s define a method with one argument in every list and call it currying. Nay, this doesn’t work either:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">x1</span>(a: Int)(b: Int) = <span class="dv">1</span>
-
-<span class="fu">x1</span>(<span class="dv">2</span>)
-<span class="co">// missing arguments for method x1;</span>
-<span class="co">// follow this method with `_' ...</span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="sourceCode scala"><code class="sourceCode scala"><a class="sourceLine" id="cb7-1" title="1"><span class="kw">def</span> <span class="fu">x1</span>(a: Int)(b: Int) = <span class="dv">1</span></a>
+<a class="sourceLine" id="cb7-2" title="2"></a>
+<a class="sourceLine" id="cb7-3" title="3"><span class="fu">x1</span>(<span class="dv">2</span>)</a>
+<a class="sourceLine" id="cb7-4" title="4"><span class="co">// missing arguments for method x1;</span></a>
+<a class="sourceLine" id="cb7-5" title="5"><span class="co">// follow this method with `_' ...</span></a></code></pre></div>
 <p>So what this “currying” is good for? Well, it’s a type inference tool. Consider this:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">  <span class="kw">def</span> foldLeft[B](z: B)(f: (B, A) =&gt; B): B = {
-     ...
-  }</code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode scala"><code class="sourceCode scala"><a class="sourceLine" id="cb8-1" title="1">  <span class="kw">def</span> foldLeft[B](z: B)(f: (B, A) =&gt; B): B = {</a>
+<a class="sourceLine" id="cb8-2" title="2">     ...</a>
+<a class="sourceLine" id="cb8-3" title="3">  }</a></code></pre></div>
 <p>Scala has a local inference, so if I put all parameters into the same list it won’t infer function type in this example:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">List(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>).<span class="fu">myFoldLeft</span>(<span class="dv">0</span>, _ + _)
-<span class="co">// Error, can't infer the type of f</span>
-
-List(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>).<span class="fu">foldLeft</span>(<span class="dv">0</span>)(_ + _)
-<span class="co">// No problem here</span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode scala"><code class="sourceCode scala"><a class="sourceLine" id="cb9-1" title="1">List(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>).<span class="fu">myFoldLeft</span>(<span class="dv">0</span>, _ + _)</a>
+<a class="sourceLine" id="cb9-2" title="2"><span class="co">// Error, can't infer the type of f</span></a>
+<a class="sourceLine" id="cb9-3" title="3"></a>
+<a class="sourceLine" id="cb9-4" title="4">List(<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>).<span class="fu">foldLeft</span>(<span class="dv">0</span>)(_ + _)</a>
+<a class="sourceLine" id="cb9-5" title="5"><span class="co">// No problem here</span></a></code></pre></div>
 <p>The reason why the second example works is because Scala checks the first parameter list first and infers that <code>B</code> is <code>Int</code>. So finding type of <code>f</code> becomes simple. In the first case it’s not possible.</p>
 
         </div>
