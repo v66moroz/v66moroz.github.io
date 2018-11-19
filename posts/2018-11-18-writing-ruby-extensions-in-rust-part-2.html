@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <title>Victor Moroz - Writing Ruby extensions in Rust: Part 2</title>
+        <link rel="stylesheet" type="text/css" href="../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../css/syntax.css" />
+        <script>
+            (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+            m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+            })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+            ga('create', 'UA-62008520-1', 'auto');
+            ga('send', 'pageview');
+        </script>
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../">Victor Moroz</a>
+            </div>
+            <div id="navigation">
+                |
+                <a href="../">Index</a>
+<!--             
+                <a href="/about.html">About</a>
+                <a href="/contact.html">Contact</a>
+                <a href="/archive.html">Archive</a>
+-->        
+            </div>
+            <div class="spacer">
+            </div>
+        </div>
+
+        <div id="content">
+            <h3>Writing Ruby extensions in Rust: Part 2</h3>
+            <div class="info">
+    Posted on November 18, 2018
+    
+</div>
+
+<p>In the <a href="../posts/2018-11-17-writing-ruby-extensions-in-rust-part-1.html">part 1</a> I showed how to create Ruby gem with simple native extension written in Rust. This time I want to extend it and create something useful, namely fast CSV parser. So what’s the plan? I want to create <code>Enumerator</code>-style class which can be represented in Ruby as:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb1-1" title="1"><span class="kw">class</span> <span class="dt">HelixCSV</span></a>
+<a class="sourceLine" id="cb1-2" title="2">  <span class="kw">def</span> initialize(file_path)</a>
+<a class="sourceLine" id="cb1-3" title="3">    <span class="co"># Save path</span></a>
+<a class="sourceLine" id="cb1-4" title="4">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb1-5" title="5"></a>
+<a class="sourceLine" id="cb1-6" title="6">  <span class="kw">def</span> open</a>
+<a class="sourceLine" id="cb1-7" title="7">    <span class="co"># Open file</span></a>
+<a class="sourceLine" id="cb1-8" title="8">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb1-9" title="9"></a>
+<a class="sourceLine" id="cb1-10" title="10">  <span class="kw">def</span> <span class="kw">next</span></a>
+<a class="sourceLine" id="cb1-11" title="11">    <span class="co"># Returns an Array of fields or nil if EOF</span></a>
+<a class="sourceLine" id="cb1-12" title="12">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb1-13" title="13"></a>
+<a class="sourceLine" id="cb1-14" title="14">  <span class="kw">def</span> close</a>
+<a class="sourceLine" id="cb1-15" title="15">    <span class="co"># Close file</span></a>
+<a class="sourceLine" id="cb1-16" title="16">  <span class="kw">end</span></a>
+<a class="sourceLine" id="cb1-17" title="17"><span class="kw">end</span></a></code></pre></div>
+<p>Let’s first look at Rust code from the <a href="../posts/2018-11-17-writing-ruby-extensions-in-rust-part-1.html">part 1</a>:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode rust"><code class="sourceCode rust"><a class="sourceLine" id="cb2-1" title="1"><span class="at">#[</span>macro_use<span class="at">]</span></a>
+<a class="sourceLine" id="cb2-2" title="2"><span class="kw">extern</span> <span class="kw">crate</span> helix;</a>
+<a class="sourceLine" id="cb2-3" title="3"></a>
+<a class="sourceLine" id="cb2-4" title="4"><span class="pp">ruby!</span> <span class="op">{</span></a>
+<a class="sourceLine" id="cb2-5" title="5">    class HelixCSV <span class="op">{</span></a>
+<a class="sourceLine" id="cb2-6" title="6">        <span class="co">// skipped</span></a>
+<a class="sourceLine" id="cb2-7" title="7"></a>
+<a class="sourceLine" id="cb2-8" title="8">        def add(&amp;<span class="kw">mut</span> <span class="kw">self</span>, m: <span class="dt">i64</span>) -&gt; <span class="dt">i64</span> <span class="op">{</span></a>
+<a class="sourceLine" id="cb2-9" title="9">            <span class="kw">self</span>.n += m;</a>
+<a class="sourceLine" id="cb2-10" title="10">            <span class="kw">self</span>.n</a>
+<a class="sourceLine" id="cb2-11" title="11">        <span class="op">}</span></a>
+<a class="sourceLine" id="cb2-12" title="12">    <span class="op">}</span></a>
+<a class="sourceLine" id="cb2-13" title="13"></a>
+<a class="sourceLine" id="cb2-14" title="14"><span class="op">}</span></a></code></pre></div>
+<p>Here <code>ruby!</code> is a macro which does all the heavy lifting. <code>def</code> body looks just like normal Rust code, but Ruby doesn’t have <code>i64</code> or any other Rust type, so what happens behind the scene is a <a href="https://github.com/tildeio/helix/tree/v0.7.5/src/coercions">type coercion</a> between Ruby and Rust. When I call <code>helix_csv.add(1)</code> in Ruby, <code>helix</code> will convert Ruby <code>Integer</code> into Rust <code>i64</code> and return value of type <code>i64</code> back to <code>Integer</code>. Appart from simple types (<code>Float</code> &lt;&gt; <code>f64</code>, <code>Integer</code> &lt;&gt; <code>i64</code> etc.) and collections (e.g. <code>Array of Float</code> &lt;&gt; <code>Vec&lt;f64&gt;</code>, <code>Hash of Float, String</code> &lt;&gt; <code>HashMap&lt;f64, String&gt;</code>) coercions also cover two special cases:</p>
+<ol type="1">
+<li>Rust doesn’t have <code>nil</code>s while Ruby has them, <code>helix</code> uses <code>Option&lt;_&gt;</code> type to represent <code>nil</code>able values (<code>String|nil</code> &lt;&gt; <code>Option&lt;String&gt;</code>), and of course you are free to compose them, e.g. <code>Array of Float|nil</code> &lt;&gt; <code>Option&lt;Vec&lt;f64&gt;&gt;</code>.</li>
+<li>Rust doesn’t have exceptions, so to raise Ruby exception we will need to wrap return value in <code>Result&lt;_, helix::Error&gt;</code>, and then we can use macro <code>raise!</code> to raise an exception, and we can combine types too:</li>
+</ol>
+<div class="sourceCode" id="cb3"><pre class="sourceCode rust"><code class="sourceCode rust"><a class="sourceLine" id="cb3-1" title="1">    def toArray(&amp;<span class="kw">self</span>, x: <span class="dt">f64</span>) -&gt; <span class="dt">Result</span>&lt;<span class="dt">Option</span>&lt;<span class="dt">Vec</span>&lt;<span class="dt">f64</span>&gt;&gt;, <span class="pp">helix::</span>Error&gt; <span class="op">{</span></a>
+<a class="sourceLine" id="cb3-2" title="2">        <span class="kw">if</span> x &lt; <span class="dv">0.0</span> <span class="op">{</span></a>
+<a class="sourceLine" id="cb3-3" title="3">            <span class="pp">raise!</span>(<span class="st">&quot;Negative value!&quot;</span>) <span class="co">//=&gt; Exception</span></a>
+<a class="sourceLine" id="cb3-4" title="4">        <span class="op">}</span> <span class="kw">else</span> <span class="kw">if</span> x &lt; <span class="dv">1.0</span> <span class="op">{</span></a>
+<a class="sourceLine" id="cb3-5" title="5">            <span class="cn">Ok</span>(<span class="cn">Some</span>(<span class="pp">vec!</span><span class="op">[</span>x<span class="op">]</span>)) <span class="co">//=&gt; [x]</span></a>
+<a class="sourceLine" id="cb3-6" title="6">        <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></a>
+<a class="sourceLine" id="cb3-7" title="7">            <span class="cn">Ok</span>(<span class="cn">None</span>) <span class="co">//=&gt; nil</span></a>
+<a class="sourceLine" id="cb3-8" title="8">        <span class="op">}</span></a>
+<a class="sourceLine" id="cb3-9" title="9">    <span class="op">}</span></a></code></pre></div>
+<p>There is one caveat: <code>initialize</code> has to return <code>struct</code>, which means it should be flawless and can’t raise exceptions, so we won’t be able to open a file in <code>HelixCSV::new</code> and skip <code>open</code>, <code>initialize</code> will only save file path. <code>open</code> will open a file and save some kind of an iterator: <code>Option&lt;CSVIter&gt;</code> for <code>next</code>. <a href="https://docs.rs/csv/1.0.2/csv/">Rust CSV crate</a> creates an iterator of type <code>Iterator&lt;Item=Result&lt;csv::StringRecord, csv::Error&gt;&gt;</code>, but since it’s a dynamic type I have to box it and wrap into a structure:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode rust"><code class="sourceCode rust"><a class="sourceLine" id="cb4-1" title="1"><span class="kw">type</span> CSVIterType = <span class="bu">Iterator</span>&lt;Item=<span class="dt">Result</span>&lt;<span class="pp">csv::</span>StringRecord, <span class="pp">csv::</span>Error&gt;&gt;;</a>
+<a class="sourceLine" id="cb4-2" title="2"></a>
+<a class="sourceLine" id="cb4-3" title="3"><span class="kw">struct</span> CSVIter <span class="op">{</span></a>
+<a class="sourceLine" id="cb4-4" title="4">    iter: <span class="dt">Box</span>&lt;CSVIterType&gt;,</a>
+<a class="sourceLine" id="cb4-5" title="5"><span class="op">}</span></a></code></pre></div>
+<p>Also all fields that are used in <code>helix</code> structure have to implement <code>Debug</code> and <code>Clone</code> traits. Since I’m not going to use them I can simply define them as:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode rust"><code class="sourceCode rust"><a class="sourceLine" id="cb5-1" title="1"><span class="kw">impl</span> <span class="pp">std::fmt::</span><span class="bu">Debug</span> <span class="kw">for</span> CSVIter <span class="op">{</span></a>
+<a class="sourceLine" id="cb5-2" title="2">    <span class="kw">fn</span> fmt(&amp;<span class="kw">self</span>, f: &amp;<span class="kw">mut</span> <span class="pp">std::fmt::</span>Formatter) -&gt; <span class="pp">std::fmt::</span><span class="dt">Result</span> <span class="op">{</span></a>
+<a class="sourceLine" id="cb5-3" title="3">        <span class="pp">write!</span>(f, <span class="st">&quot;CSVIter&quot;</span>)</a>
+<a class="sourceLine" id="cb5-4" title="4">    <span class="op">}</span></a>
+<a class="sourceLine" id="cb5-5" title="5"><span class="op">}</span></a>
+<a class="sourceLine" id="cb5-6" title="6"></a>
+<a class="sourceLine" id="cb5-7" title="7"><span class="kw">impl</span> <span class="bu">Clone</span> <span class="kw">for</span> CSVIter <span class="op">{</span></a>
+<a class="sourceLine" id="cb5-8" title="8">    <span class="kw">fn</span> clone(&amp;<span class="kw">self</span>) -&gt; CSVIter <span class="op">{</span> </a>
+<a class="sourceLine" id="cb5-9" title="9">        <span class="pp">panic!</span>(<span class="st">&quot;Not cloneable!&quot;</span>) </a>
+<a class="sourceLine" id="cb5-10" title="10">    <span class="op">}</span></a>
+<a class="sourceLine" id="cb5-11" title="11"><span class="op">}</span></a></code></pre></div>
+<p>Now it’s easy to implement <code>open</code> and <code>next</code>, here’s how the final version of <code>lib.rs</code> looks like:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode rust"><code class="sourceCode rust"><a class="sourceLine" id="cb6-1" title="1"><span class="kw">extern</span> <span class="kw">crate</span> csv;</a>
+<a class="sourceLine" id="cb6-2" title="2"></a>
+<a class="sourceLine" id="cb6-3" title="3"><span class="at">#[</span>macro_use<span class="at">]</span></a>
+<a class="sourceLine" id="cb6-4" title="4"><span class="kw">extern</span> <span class="kw">crate</span> helix;</a>
+<a class="sourceLine" id="cb6-5" title="5"></a>
+<a class="sourceLine" id="cb6-6" title="6"><span class="kw">use</span> <span class="pp">std::fs::</span>File;</a>
+<a class="sourceLine" id="cb6-7" title="7"><span class="kw">use</span> <span class="pp">std::io::</span>BufReader;</a>
+<a class="sourceLine" id="cb6-8" title="8"></a>
+<a class="sourceLine" id="cb6-9" title="9"><span class="kw">type</span> CSVIterType = <span class="bu">Iterator</span>&lt;Item=<span class="dt">Result</span>&lt;<span class="pp">csv::</span>StringRecord, <span class="pp">csv::</span>Error&gt;&gt;;</a>
+<a class="sourceLine" id="cb6-10" title="10"></a>
+<a class="sourceLine" id="cb6-11" title="11"><span class="kw">struct</span> CSVIter <span class="op">{</span></a>
+<a class="sourceLine" id="cb6-12" title="12">    iter: <span class="dt">Box</span>&lt;CSVIterType&gt;,</a>
+<a class="sourceLine" id="cb6-13" title="13"><span class="op">}</span></a>
+<a class="sourceLine" id="cb6-14" title="14"></a>
+<a class="sourceLine" id="cb6-15" title="15"><span class="kw">impl</span> <span class="pp">std::fmt::</span><span class="bu">Debug</span> <span class="kw">for</span> CSVIter <span class="op">{</span></a>
+<a class="sourceLine" id="cb6-16" title="16">    <span class="kw">fn</span> fmt(&amp;<span class="kw">self</span>, f: &amp;<span class="kw">mut</span> <span class="pp">std::fmt::</span>Formatter) -&gt; <span class="pp">std::fmt::</span><span class="dt">Result</span> <span class="op">{</span></a>
+<a class="sourceLine" id="cb6-17" title="17">        <span class="pp">write!</span>(f, <span class="st">&quot;CSVIter&quot;</span>)</a>
+<a class="sourceLine" id="cb6-18" title="18">    <span class="op">}</span></a>
+<a class="sourceLine" id="cb6-19" title="19"><span class="op">}</span></a>
+<a class="sourceLine" id="cb6-20" title="20"></a>
+<a class="sourceLine" id="cb6-21" title="21"><span class="kw">impl</span> <span class="bu">Clone</span> <span class="kw">for</span> CSVIter <span class="op">{</span></a>
+<a class="sourceLine" id="cb6-22" title="22">    <span class="kw">fn</span> clone(&amp;<span class="kw">self</span>) -&gt; CSVIter <span class="op">{</span> </a>
+<a class="sourceLine" id="cb6-23" title="23">        <span class="pp">panic!</span>(<span class="st">&quot;Not cloneable!&quot;</span>) </a>
+<a class="sourceLine" id="cb6-24" title="24">    <span class="op">}</span></a>
+<a class="sourceLine" id="cb6-25" title="25"><span class="op">}</span></a>
+<a class="sourceLine" id="cb6-26" title="26"></a>
+<a class="sourceLine" id="cb6-27" title="27"><span class="pp">ruby!</span> <span class="op">{</span></a>
+<a class="sourceLine" id="cb6-28" title="28">    class HelixCSV <span class="op">{</span></a>
+<a class="sourceLine" id="cb6-29" title="29">        <span class="kw">struct</span> <span class="op">{</span></a>
+<a class="sourceLine" id="cb6-30" title="30">            path: <span class="dt">String</span>,</a>
+<a class="sourceLine" id="cb6-31" title="31">            iter: <span class="dt">Option</span>&lt;CSVIter&gt;,</a>
+<a class="sourceLine" id="cb6-32" title="32">        <span class="op">}</span></a>
+<a class="sourceLine" id="cb6-33" title="33"></a>
+<a class="sourceLine" id="cb6-34" title="34">        def initialize(helix, path: <span class="dt">String</span>) <span class="op">{</span></a>
+<a class="sourceLine" id="cb6-35" title="35">            HelixCSV <span class="op">{</span> helix, path, iter: <span class="cn">None</span> <span class="op">}</span></a>
+<a class="sourceLine" id="cb6-36" title="36">        <span class="op">}</span></a>
+<a class="sourceLine" id="cb6-37" title="37"></a>
+<a class="sourceLine" id="cb6-38" title="38">        def open(&amp;<span class="kw">mut</span> <span class="kw">self</span>) -&gt; <span class="dt">Result</span>&lt;(), <span class="pp">helix::</span>Error&gt; <span class="op">{</span></a>
+<a class="sourceLine" id="cb6-39" title="39">            <span class="kw">self</span>.iter = <span class="cn">None</span>;</a>
+<a class="sourceLine" id="cb6-40" title="40"></a>
+<a class="sourceLine" id="cb6-41" title="41">            <span class="kw">let</span> buf_reader = </a>
+<a class="sourceLine" id="cb6-42" title="42">                <span class="kw">match</span> <span class="pp">File::</span>open(&amp;<span class="kw">self</span>.path) <span class="op">{</span></a>
+<a class="sourceLine" id="cb6-43" title="43">                    <span class="cn">Ok</span>(f)   =&gt; <span class="pp">BufReader::</span>new(f),</a>
+<a class="sourceLine" id="cb6-44" title="44">                    <span class="cn">Err</span>(e)  =&gt; <span class="pp">raise!</span>(e.to_string()),</a>
+<a class="sourceLine" id="cb6-45" title="45">                <span class="op">}</span>;</a>
+<a class="sourceLine" id="cb6-46" title="46"></a>
+<a class="sourceLine" id="cb6-47" title="47">            <span class="kw">let</span> csv_reader =</a>
+<a class="sourceLine" id="cb6-48" title="48">                <span class="pp">csv::ReaderBuilder::</span>new()</a>
+<a class="sourceLine" id="cb6-49" title="49">                    .has_headers(<span class="cn">false</span>)</a>
+<a class="sourceLine" id="cb6-50" title="50">                    .from_reader(buf_reader);</a>
+<a class="sourceLine" id="cb6-51" title="51"></a>
+<a class="sourceLine" id="cb6-52" title="52">            <span class="kw">self</span>.iter = <span class="cn">Some</span>(CSVIter<span class="op">{</span>iter: <span class="dt">Box</span>::new(csv_reader.into_records())<span class="op">}</span>);</a>
+<a class="sourceLine" id="cb6-53" title="53">            <span class="cn">Ok</span>(())</a>
+<a class="sourceLine" id="cb6-54" title="54">        <span class="op">}</span></a>
+<a class="sourceLine" id="cb6-55" title="55"></a>
+<a class="sourceLine" id="cb6-56" title="56">        def next(&amp;<span class="kw">mut</span> <span class="kw">self</span>) -&gt; <span class="dt">Result</span>&lt;<span class="dt">Option</span>&lt;<span class="dt">Vec</span>&lt;<span class="dt">String</span>&gt;&gt;, <span class="pp">helix::</span>Error&gt; <span class="op">{</span></a>
+<a class="sourceLine" id="cb6-57" title="57">            <span class="kw">match</span> <span class="kw">self</span>.iter <span class="op">{</span></a>
+<a class="sourceLine" id="cb6-58" title="58">                <span class="cn">Some</span>(<span class="kw">ref</span> <span class="kw">mut</span> iter) =&gt;</a>
+<a class="sourceLine" id="cb6-59" title="59">                    <span class="kw">match</span> iter.iter.next() <span class="op">{</span></a>
+<a class="sourceLine" id="cb6-60" title="60">                        <span class="cn">Some</span>(<span class="cn">Ok</span>(record)) =&gt;</a>
+<a class="sourceLine" id="cb6-61" title="61">                            <span class="cn">Ok</span>(<span class="cn">Some</span>(record.iter().map(|s| s.to_string()).collect())), </a>
+<a class="sourceLine" id="cb6-62" title="62">                        <span class="cn">Some</span>(<span class="cn">Err</span>(e)) =&gt;</a>
+<a class="sourceLine" id="cb6-63" title="63">                            <span class="pp">raise!</span>(e.to_string()),</a>
+<a class="sourceLine" id="cb6-64" title="64">                        <span class="cn">None</span> =&gt;</a>
+<a class="sourceLine" id="cb6-65" title="65">                            <span class="cn">Ok</span>(<span class="cn">None</span>)</a>
+<a class="sourceLine" id="cb6-66" title="66">                    <span class="op">}</span></a>
+<a class="sourceLine" id="cb6-67" title="67">                <span class="cn">None</span> =&gt;</a>
+<a class="sourceLine" id="cb6-68" title="68">                    <span class="pp">raise!</span>(<span class="st">&quot;closed file&quot;</span>)</a>
+<a class="sourceLine" id="cb6-69" title="69">            <span class="op">}</span></a>
+<a class="sourceLine" id="cb6-70" title="70">        <span class="op">}</span></a>
+<a class="sourceLine" id="cb6-71" title="71"></a>
+<a class="sourceLine" id="cb6-72" title="72">        def close(&amp;<span class="kw">mut</span> <span class="kw">self</span>) -&gt; () <span class="op">{</span></a>
+<a class="sourceLine" id="cb6-73" title="73">            <span class="kw">self</span>.iter = <span class="cn">None</span></a>
+<a class="sourceLine" id="cb6-74" title="74">        <span class="op">}</span></a>
+<a class="sourceLine" id="cb6-75" title="75">    <span class="op">}</span></a>
+<a class="sourceLine" id="cb6-76" title="76"><span class="op">}</span></a></code></pre></div>
+<p>We also need to add dependency to <code>Cargo.toml</code>:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode conf"><code class="sourceCode ini"><a class="sourceLine" id="cb7-1" title="1"><span class="kw">[dependencies]</span></a>
+<a class="sourceLine" id="cb7-2" title="2"><span class="dt">helix </span><span class="ot">=</span><span class="st"> &quot;</span><span class="dv">0</span><span class="st">.</span><span class="fl">7.5</span><span class="st">&quot;</span></a>
+<a class="sourceLine" id="cb7-3" title="3"><span class="dt">csv </span><span class="ot">=</span><span class="st"> &quot;</span><span class="dv">1</span><span class="st">.</span><span class="fl">0.2</span><span class="st">&quot;</span></a></code></pre></div>
+<p>and the only thing left is to build native extension:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode bash"><code class="sourceCode bash"><a class="sourceLine" id="cb8-1" title="1">$ <span class="ex">rake</span> build</a>
+<a class="sourceLine" id="cb8-2" title="2">{}</a>
+<a class="sourceLine" id="cb8-3" title="3"><span class="ex">cargo</span> rustc --release -- -C link-args=-Wl,-undefined,dynamic_lookup</a>
+<a class="sourceLine" id="cb8-4" title="4">   <span class="ex">Compiling</span> version_check v0.1.5</a>
+<a class="sourceLine" id="cb8-5" title="5">   <span class="ex">Compiling</span> libc v0.2.43                                                                                      </a>
+<a class="sourceLine" id="cb8-6" title="6">   <span class="ex">Compiling</span> cfg-if v0.1.6                                                                                       </a>
+<a class="sourceLine" id="cb8-7" title="7">   <span class="ex">Compiling</span> serde v1.0.80                                                                                       </a>
+<a class="sourceLine" id="cb8-8" title="8">   <span class="ex">Compiling</span> libcruby-sys v0.7.5                                                                                       </a>
+<a class="sourceLine" id="cb8-9" title="9">   <span class="ex">Compiling</span> cstr-macro v0.1.0                                                                                       </a>
+<a class="sourceLine" id="cb8-10" title="10">   <span class="ex">Compiling</span> memchr v2.1.1                                                                                       </a>
+<a class="sourceLine" id="cb8-11" title="11">   <span class="ex">Compiling</span> csv-core v0.1.4                                                                                       </a>
+<a class="sourceLine" id="cb8-12" title="12">   <span class="ex">Compiling</span> helix v0.7.5                                                                                       </a>
+<a class="sourceLine" id="cb8-13" title="13">   <span class="ex">Compiling</span> csv v1.0.2</a>
+<a class="sourceLine" id="cb8-14" title="14">   <span class="ex">Compiling</span> helix_csv v0.1.0 (.../helix_csv)                                                             </a>
+<a class="sourceLine" id="cb8-15" title="15">    <span class="ex">Finished</span> release [optimized] target(s) <span class="kw">in</span> <span class="ex">25.91s</span></a>
+<a class="sourceLine" id="cb8-16" title="16"></a>
+<a class="sourceLine" id="cb8-17" title="17">$ <span class="ex">bin/console</span></a>
+<a class="sourceLine" id="cb8-18" title="18"><span class="ex">2.5.3</span> :001 <span class="op">&gt;</span> csv = HelixCSV.new(<span class="st">&quot;sample.csv&quot;</span>)</a>
+<a class="sourceLine" id="cb8-19" title="19"> =<span class="op">&gt;</span> <span class="co">#&lt;HelixCSV:0x000055b9b1aa6e08&gt; </span></a>
+<a class="sourceLine" id="cb8-20" title="20"><span class="ex">2.5.3</span> :002 <span class="op">&gt;</span> csv.open</a>
+<a class="sourceLine" id="cb8-21" title="21"> =<span class="op">&gt;</span> <span class="ex">nil</span> </a>
+<a class="sourceLine" id="cb8-22" title="22"><span class="ex">2.5.3</span> :003 <span class="op">&gt;</span> csv.next</a>
+<a class="sourceLine" id="cb8-23" title="23"> =<span class="op">&gt;</span> [<span class="st">&quot;a407cd64-b473-44b6-910c-8f6d09dc2a6a&quot;</span>, <span class="st">&quot;6982c5ab-8f07-4f8e-bd0b-9f2bf5ec626e&quot;</span>, <span class="ex">...</span>]</a>
+<a class="sourceLine" id="cb8-24" title="24"><span class="ex">2.5.3</span> :004 <span class="op">&gt;</span> csv.close</a>
+<a class="sourceLine" id="cb8-25" title="25"> =<span class="op">&gt;</span> <span class="ex">nil</span> </a></code></pre></div>
+<h3 id="benchmarks">Benchmarks</h3>
+<h4 id="code">Code</h4>
+<div class="sourceCode" id="cb9"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb9-1" title="1"><span class="co"># FastestCSV</span></a>
+<a class="sourceLine" id="cb9-2" title="2"><span class="dt">FastestCSV</span>.foreach(<span class="st">'sample.csv'</span>) <span class="kw">do</span> |rec|</a>
+<a class="sourceLine" id="cb9-3" title="3"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb9-4" title="4"></a>
+<a class="sourceLine" id="cb9-5" title="5"><span class="co"># HelixCSV</span></a>
+<a class="sourceLine" id="cb9-6" title="6">csv_reader = <span class="dt">HelixCSV</span>.new(<span class="st">'sample.csv'</span>)</a>
+<a class="sourceLine" id="cb9-7" title="7">csv_reader.open</a>
+<a class="sourceLine" id="cb9-8" title="8">while (rec = csv_reader.next) <span class="kw">do</span></a>
+<a class="sourceLine" id="cb9-9" title="9"><span class="kw">end</span></a>
+<a class="sourceLine" id="cb9-10" title="10">csv_reader.close</a>
+<a class="sourceLine" id="cb9-11" title="11"></a>
+<a class="sourceLine" id="cb9-12" title="12"><span class="co"># CSV</span></a>
+<a class="sourceLine" id="cb9-13" title="13"><span class="dt">CSV</span>.foreach(<span class="st">'sample.csv'</span>) <span class="kw">do</span> |rec|</a>
+<a class="sourceLine" id="cb9-14" title="14"><span class="kw">end</span></a></code></pre></div>
+<h4 id="data">Data</h4>
+<table>
+<thead>
+<tr class="header">
+<th>Records</th>
+<th>Fields per record</th>
+<th>File size</th>
+<th>CPU</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1M</td>
+<td>21</td>
+<td>742M</td>
+<td>i7-6600U @ 2.60GHz</td>
+</tr>
+</tbody>
+</table>
+<h4 id="results">Results</h4>
+<table>
+<thead>
+<tr class="header">
+<th>gem</th>
+<th>FastestCSV</th>
+<th>HelixCSV</th>
+<th>CSV</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Time, secs</td>
+<td>9.54</td>
+<td>12.9</td>
+<td>42.5</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Note</strong>: FastestCSV doesn’t seem to decode embedded newlines, which in my case was a deal breaker.</p>
+<h3 id="was-it-worth-the-time-and-effort">Was it worth the time and effort?</h3>
+<p>At one of my jobs I had to read and analyze large <code>csv</code> files (it’s a very popular format in the enterprise world!) and company codebase was mostly written in Ruby. Finding fast gem that handles “standard” <code>csv</code> (i.e. <code>csv</code> you get from Excel or Postgres) proved to be pretty complicated, not only in Ruby world, but even in Java. Many fail to decode newlines inside quoted fields (both Excel and Postgres exports can easily have them). We used patched <code>FastestCSV</code>, but even my simple gem can easily outperform <code>FastestCSV</code> e.g. if I want only certain columns. Big part of the time is spent instantiating Ruby objects and coercing types, so if I only want one column out of 21 in my sample file, 12.9 secs will become only 4.7 secs. I can also offload a lot of other work to Rust, e.g. finding unique values, checking and converting types etc. This will be a <strong>way</strong> faster than Ruby with relatively small amount of Rust code. Not to mention that <a href="https://docs.rs/csv/1.0.2/csv/">Rust CSV crate</a> has tons of other options.</p>
+
+        </div>
+
+        
+            <div id="disqus_thread"></div>
+            <script type="text/javascript">
+                var disqus_shortname = 'blog-vmoroz-com';
+                var disqus_identifier = '45ec0b48-32e2-4449-9e49-213f407d4589';
+                
+                (function() {
+                    var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+                    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+                    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+                })();
+            </script>
+            <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript" rel="nofollow">comments powered by Disqus.</a></noscript>
+        
+
+        <div id="footer">
+            Generated by
+            <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+    </body>
+</html>
