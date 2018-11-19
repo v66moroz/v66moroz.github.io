@@ -89,7 +89,7 @@
 <a class="sourceLine" id="cb2-3" title="3"><span class="ex">...</span></a>
 <a class="sourceLine" id="cb2-4" title="4"></a>
 <a class="sourceLine" id="cb2-5" title="5">$ <span class="bu">cd</span> helix_csv</a></code></pre></div>
-<p>I chose name <code>helix_csv</code> for a reason. Later I plan to convert this gem to fast CSV parser. After fixing <code>helix_csv.gemspec</code> TODOs to make <code>bundler</code> happy we need to add <code>helix</code> dependency:</p>
+<p>I chose name <code>helix_csv</code> for a reason. Later I plan to convert this gem to fast CSV parser. After fixing <code>helix_csv.gemspec</code> TODOs to make <code>bundler</code> happy and changing <code>module HelixCsv</code> to <code>class HelixCSV</code> in <code>lib</code>, we need to add <code>helix</code> dependency:</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode gemspec"><code class="sourceCode ruby"><a class="sourceLine" id="cb3-1" title="1">  spec.add_runtime_dependency <span class="st">&quot;helix_runtime&quot;</span>, <span class="st">&quot;= 0.7.5&quot;</span></a></code></pre></div>
 <p>and then run <code>bundle install --path=vendor/bundle</code> to install required gems. Next we need to replace <code>Rakefile</code> content with something like this:</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb4-1" title="1">require <span class="st">'bundler/setup'</span></a>
@@ -208,7 +208,7 @@
 <a class="sourceLine" id="cb16-27" title="27"> =<span class="op">&gt;</span> <span class="ex">5</span> </a>
 <a class="sourceLine" id="cb16-28" title="28"><span class="ex">2.5.3</span> :005 <span class="op">&gt;</span> helix_csv.n</a>
 <a class="sourceLine" id="cb16-29" title="29"> =<span class="op">&gt;</span> <span class="ex">5</span> </a></code></pre></div>
-<p>In the next part I’m going to implement CSV parser based on <a href="https://docs.rs/csv/1.0.2/csv/">Rust CSV crate</a> and do some benchmarks.</p>
+<p>In the <a href="../posts/2018-11-18-writing-ruby-extensions-in-rust-part-2.html">part 2</a> I’m going to implement CSV parser based on <a href="https://docs.rs/csv/1.0.2/csv/">Rust CSV crate</a> and do some benchmarks.</p>
 
         </div>
 
