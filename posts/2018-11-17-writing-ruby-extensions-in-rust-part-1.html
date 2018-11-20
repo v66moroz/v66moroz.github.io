@@ -107,10 +107,10 @@
 <p>and <code>helix</code> to the <code>[dependencies]</code> section:</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode conf"><code class="sourceCode ini"><a class="sourceLine" id="cb7-1" title="1"><span class="kw">[dependencies]</span></a>
 <a class="sourceLine" id="cb7-2" title="2"><span class="dt">helix </span><span class="ot">=</span><span class="st"> &quot;</span><span class="dv">0</span><span class="st">.</span><span class="fl">7.5</span><span class="st">&quot;</span></a></code></pre></div>
-<p>Before we can start writing Rust code we need to create a glue between Ruby and Rust in <code>lib/helix_csv.rb</code> by adding this two lines to the top of that file:</p>
+<p>Before we can start writing Rust code we need to create a glue between Ruby and Rust in <code>lib/helix_csv.rb</code> by adding these two lines to the top of that file:</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb8-1" title="1">require <span class="st">'helix_runtime'</span></a>
 <a class="sourceLine" id="cb8-2" title="2">require <span class="st">'helix_csv/native'</span></a></code></pre></div>
-<p>Now we can finally write gem code. Let’s replace contenct of <code>src/lib.rs</code> with:</p>
+<p>Now we can finally write gem code. Let’s replace content of <code>src/lib.rs</code> with:</p>
 <div class="sourceCode" id="cb9"><pre class="sourceCode rust"><code class="sourceCode rust"><a class="sourceLine" id="cb9-1" title="1"><span class="at">#[</span>macro_use<span class="at">]</span></a>
 <a class="sourceLine" id="cb9-2" title="2"><span class="kw">extern</span> <span class="kw">crate</span> helix;</a>
 <a class="sourceLine" id="cb9-3" title="3"></a>
