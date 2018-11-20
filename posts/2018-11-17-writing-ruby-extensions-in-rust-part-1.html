@@ -155,7 +155,7 @@
 <a class="sourceLine" id="cb11-7" title="7"> =&gt; <span class="dv">5</span> </a>
 <a class="sourceLine" id="cb11-8" title="8"><span class="fl">2.5</span>.<span class="dv">3</span> :<span class="dv">004</span> &gt; helix_csv.n</a>
 <a class="sourceLine" id="cb11-9" title="9"> =&gt; <span class="dv">5</span> </a></code></pre></div>
-<p>Not terribly interesting gem, but it works! We can’t package the gem yet as <code>gem install</code> needs to build native extension and we need to instruct <code>gem</code> how to do it. It’s not very complicated though, we only need to add <code>extconf.rb</code> to the root of our gem. The purpose of this script is to create <code>Makefile</code>:</p>
+<p>Not terribly interesting gem, but it works! We can’t package the gem yet as <code>gem install</code> needs to build native extension and we need to instruct <code>gem</code> how to do it. It’s not very complicated though, we only need to add <code>spec.extensions = %w[extconf.rb]</code> to our <code>helix_csv.gemspec</code> and script <code>extconf.rb</code> to the root of our gem. The purpose of this script is to create <code>Makefile</code>:</p>
 <div class="sourceCode" id="cb12"><pre class="sourceCode ruby"><code class="sourceCode ruby"><a class="sourceLine" id="cb12-1" title="1">abort <span class="st">&quot;Rust compiler required (https://www.rust-lang.org/)&quot;</span> <span class="kw">if</span> <span class="st">`which rustc`</span>.empty?</a>
 <a class="sourceLine" id="cb12-2" title="2"></a>
 <a class="sourceLine" id="cb12-3" title="3"><span class="dt">File</span>.open(<span class="st">&quot;Makefile&quot;</span>, <span class="st">&quot;wb&quot;</span>) <span class="kw">do</span> |f|</a>
@@ -170,7 +170,7 @@
 <a class="sourceLine" id="cb12-12" title="12"><span class="kw">EOD</span></a>
 <a class="sourceLine" id="cb12-13" title="13"></a>
 <a class="sourceLine" id="cb12-14" title="14"><span class="kw">end</span></a></code></pre></div>
-<p>Since <code>gem</code> packager is using <code>git</code> to retrieve file list as a bare minimum we need to add files to the git cache:</p>
+<p>Since <code>gem</code> packager is using <code>git</code> to retrieve file list as a bare minimum we need to add files to the git cache (with appropriate <code>.gitignore</code>):</p>
 <div class="sourceCode" id="cb13"><pre class="sourceCode bash"><code class="sourceCode bash"><a class="sourceLine" id="cb13-1" title="1">$ <span class="fu">git</span> add .</a></code></pre></div>
 <p>Finaly we can package our gem:</p>
 <div class="sourceCode" id="cb14"><pre class="sourceCode bash"><code class="sourceCode bash"><a class="sourceLine" id="cb14-1" title="1">$ <span class="ex">gem</span> build helix_csv</a></code></pre></div>
@@ -186,7 +186,7 @@
 <a class="sourceLine" id="cb16-5" title="5"><span class="ex">Installing</span> thor 0.20.3</a>
 <a class="sourceLine" id="cb16-6" title="6"><span class="ex">Installing</span> tomlrb 1.2.7</a>
 <a class="sourceLine" id="cb16-7" title="7"><span class="ex">Installing</span> helix_runtime 0.7.5 with native extensions</a>
-<a class="sourceLine" id="cb16-8" title="8"><span class="ex">Installing</span> helix_csv 0.1.0</a>
+<a class="sourceLine" id="cb16-8" title="8"><span class="ex">Installing</span> helix_csv 0.1.0 with native extensions</a>
 <a class="sourceLine" id="cb16-9" title="9"><span class="ex">Updating</span> files in vendor/cache</a>
 <a class="sourceLine" id="cb16-10" title="10"><span class="ex">Bundle</span> complete! 1 Gemfile dependency, 6 gems now installed.</a>
 <a class="sourceLine" id="cb16-11" title="11"><span class="ex">Bundled</span> gems are installed into <span class="kw">`</span><span class="ex">./vendor/bundle</span><span class="kw">`</span></a>
